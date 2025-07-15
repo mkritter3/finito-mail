@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@finito/ui'
 import { useUnreadCount } from '@finito/storage'
+import { useEmailStore } from '@/stores/email-store'
 
 interface SidebarProps {
   isOpen: boolean
@@ -21,6 +22,13 @@ const folders = [
 export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const unreadCount = useUnreadCount()
+  const { setComposing } = useEmailStore()
+
+  const handleCompose = () => {
+    setComposing(true)
+    // Trigger compose dialog via global event
+    window.dispatchEvent(new CustomEvent('compose-email'))
+  }
 
   return (
     <div
@@ -45,6 +53,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
       {/* Compose button */}
       <div className="px-4 mb-4">
         <button
+          onClick={handleCompose}
           className={cn(
             'w-full bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors',
             isOpen ? 'px-4 py-2' : 'p-2'

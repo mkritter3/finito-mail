@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { Sidebar } from '@/components/sidebar'
 import { Header } from '@/components/header'
@@ -8,6 +8,7 @@ import { TodoPanel } from '@/components/todo-panel'
 import { SearchPanel } from '@/components/search-panel'
 import { CommandPalette } from '@/components/command-palette'
 import { KeyboardShortcutsDialog } from '@/components/keyboard-shortcuts-dialog'
+import { ComposeDialog } from '@/components/compose-dialog'
 
 export default function MailLayout({
   children,
@@ -19,6 +20,21 @@ export default function MailLayout({
   const [searchPanelOpen, setSearchPanelOpen] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState(false)
+  const [composeOpen, setComposeOpen] = useState(false)
+  const [composeMode, setComposeMode] = useState<'compose' | 'reply' | 'replyAll' | 'forward'>('compose')
+  const [replyToEmail, setReplyToEmail] = useState<any>(null)
+
+  // Listen for compose event from sidebar
+  useEffect(() => {
+    const handleComposeEvent = (event: any) => {
+      const detail = event.detail || {}
+      setComposeMode(detail.mode || 'compose')
+      setReplyToEmail(detail.replyTo || null)
+      setComposeOpen(true)
+    }
+    window.addEventListener('compose-email', handleComposeEvent)
+    return () => window.removeEventListener('compose-email', handleComposeEvent)
+  }, [])
 
   // Global keyboard shortcuts
   useHotkeys('cmd+k, ctrl+k', () => setCommandPaletteOpen(true))
@@ -26,9 +42,27 @@ export default function MailLayout({
   useHotkeys('cmd+\\, ctrl+\\', () => setSidebarOpen(!sidebarOpen))
   useHotkeys('t', () => setTodoPanelOpen(!todoPanelOpen))
   useHotkeys('\\', () => setSearchPanelOpen(true))
+  useHotkeys('c', () => {
+    setComposeMode('compose')
+    setReplyToEmail(null)
+    setComposeOpen(true)
+  })
+  useHotkeys('r', () => {
+    // Reply shortcut will be handled by email view
+    window.dispatchEvent(new CustomEvent('keyboard-reply'))
+  })
+  useHotkeys('a', () => {
+    // Reply all shortcut will be handled by email view
+    window.dispatchEvent(new CustomEvent('keyboard-reply-all'))
+  })
+  useHotkeys('f', () => {
+    // Forward shortcut will be handled by email view
+    window.dispatchEvent(new CustomEvent('keyboard-forward'))
+  })
   useHotkeys('escape', () => {
     setSearchPanelOpen(false)
     setCommandPaletteOpen(false)
+    setComposeOpen(false)
   })
 
   return (
@@ -60,6 +94,18 @@ export default function MailLayout({
       <KeyboardShortcutsDialog 
         isOpen={shortcutsDialogOpen} 
         onClose={() => setShortcutsDialogOpen(false)} 
+      />
+
+      {/* Compose Dialog */}
+      <ComposeDialog
+        isOpen={composeOpen}
+        onClose={() => {
+          setComposeOpen(false)
+          setComposeMode('compose')
+          setReplyToEmail(null)
+        }}
+        mode={composeMode}
+        replyTo={replyToEmail}
       />
     </div>
   )

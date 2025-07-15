@@ -2,6 +2,7 @@
 
 import { useEmail } from '@finito/storage'
 import { formatDistanceToNow } from '@/lib/date'
+import { Reply, ReplyAll, Forward, Archive, Trash2, Star } from 'lucide-react'
 
 interface EmailViewProps {
   emailId: string
@@ -9,6 +10,33 @@ interface EmailViewProps {
 
 export function EmailView({ emailId }: EmailViewProps) {
   const email = useEmail(emailId)
+
+  const handleReply = () => {
+    window.dispatchEvent(new CustomEvent('compose-email', { 
+      detail: { 
+        mode: 'reply',
+        replyTo: email
+      }
+    }))
+  }
+
+  const handleReplyAll = () => {
+    window.dispatchEvent(new CustomEvent('compose-email', { 
+      detail: { 
+        mode: 'replyAll',
+        replyTo: email
+      }
+    }))
+  }
+
+  const handleForward = () => {
+    window.dispatchEvent(new CustomEvent('compose-email', { 
+      detail: { 
+        mode: 'forward',
+        replyTo: email
+      }
+    }))
+  }
 
   if (!email) {
     return (
@@ -54,16 +82,40 @@ export function EmailView({ emailId }: EmailViewProps) {
       </div>
 
       {/* Actions */}
-      <div className="px-6 py-4 border-t border-border flex items-center gap-4">
-        <button className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+      <div className="px-6 py-4 border-t border-border flex items-center gap-2">
+        <button 
+          onClick={handleReply}
+          className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm"
+        >
+          <Reply className="w-4 h-4" />
           Reply
         </button>
-        <button className="px-4 py-2 border border-border rounded-md hover:bg-accent">
+        <button 
+          onClick={handleReplyAll}
+          className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-md hover:bg-muted text-sm"
+        >
+          <ReplyAll className="w-4 h-4" />
+          Reply All
+        </button>
+        <button 
+          onClick={handleForward}
+          className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-md hover:bg-muted text-sm"
+        >
+          <Forward className="w-4 h-4" />
           Forward
         </button>
-        <button className="px-4 py-2 border border-border rounded-md hover:bg-accent ml-auto">
-          Archive
-        </button>
+        
+        <div className="ml-auto flex items-center gap-2">
+          <button className="p-1.5 hover:bg-muted rounded-md transition-colors">
+            <Archive className="w-4 h-4" />
+          </button>
+          <button className="p-1.5 hover:bg-muted rounded-md transition-colors">
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <button className="p-1.5 hover:bg-muted rounded-md transition-colors">
+            <Star className={`w-4 h-4 ${email.isStarred ? 'fill-current text-yellow-500' : ''}`} />
+          </button>
+        </div>
       </div>
     </div>
   )

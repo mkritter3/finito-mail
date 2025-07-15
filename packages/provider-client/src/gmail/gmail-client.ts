@@ -73,24 +73,37 @@ export class GmailClient {
    * Send an email
    */
   async sendEmail(email: {
-    to: string[];
+    raw?: string;
+    threadId?: string;
+    to?: string[];
     cc?: string[];
     bcc?: string[];
-    subject: string;
-    body: string;
+    subject?: string;
+    body?: string;
     attachments?: Array<{ filename: string; mimeType: string; data: ArrayBuffer }>;
   }): Promise<{ id: string; threadId: string }> {
-    const message = this.createMimeMessage(email);
-    const encodedMessage = btoa(message).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    let encodedMessage: string;
+    
+    if (email.raw) {
+      // Use pre-encoded message (for compose dialog)
+      encodedMessage = email.raw;
+    } else {
+      // Create MIME message from parts
+      const message = this.createMimeMessage(email as any);
+      encodedMessage = btoa(message).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    const payload: any = { raw: encodedMessage };
+    if (email.threadId) {
+      payload.threadId = email.threadId;
+    }
 
     const response = await this.makeRequest(`${this.baseUrl}/users/me/messages/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        raw: encodedMessage,
-      }),
+      body: JSON.stringify(payload),
     });
 
     return response;
