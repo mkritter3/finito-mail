@@ -12,22 +12,28 @@ This document defines the security architecture for our client-first email clien
 4. **Minimal Attack Surface**: No central database to breach
 5. **User-Controlled Privacy**: You own your data completely
 
-## Client-First Security Model
+## Hybrid Backend-for-Frontend Security Model
 
 ### Data Flow
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    USER'S BROWSER                            │
 ├─────────────────────────────────────────────────────────────┤
-│  OAuth Tokens ──► WebCrypto API ──► Encrypted Storage       │
-│  Email Data ────► IndexedDB (50GB+)                         │
-│  Attachments ───► IndexedDB (encrypted)                     │
-│  Search Index ──► MiniSearch.js (local)                     │
+│  Session Tokens ─► Supabase Auth (JWT)                    │
+│  Email Bodies ──► IndexedDB (encrypted)                   │
+│  Attachments ──► IndexedDB (encrypted)                    │
+│  Search Index ─► MiniSearch.js (local)                     │
 └─────────────────────────────────────────────────────────────┘
                           ↓
-        Direct API calls to Gmail/Outlook
+        ┌─────────────────────────────────────────────────────────────┐
+        │                    BACKEND                             │
+        ├─────────────────────────────────────────────────────────────┤
+        │  OAuth Tokens ─► Gmail/Outlook API proxy            │
+        │  Email Headers ─► PostgreSQL (metadata only)       │
+        │  Sync State ──► Redis (temporary)                 │
+        └─────────────────────────────────────────────────────────────┘
                           ↓
-        NO SERVER INVOLVEMENT FOR EMAIL DATA
+        EMAIL CONTENT NEVER STORED ON SERVER
 ```
 
 ## Authentication - PKCE Flow
@@ -236,61 +242,66 @@ class APIKeyManager {
 - **Validation**: Test query before storage
 - **Rotation**: Prompt user to update expired keys
 
-## Security Benefits of Client-First
+## Security Benefits of Hybrid Architecture
 
-### 1. No Honeypot
+### 1. Reduced Honeypot Risk
 - Traditional: Millions of emails in central database
-- Client-First: Each user's data isolated in their browser
-- Breach impact: Single user vs. entire user base
+- Hybrid: Only metadata on servers, content stays client-side
+- Breach impact: Headers compromised, not email content
 
-### 2. Zero-Knowledge Architecture
-- We literally cannot read your emails
-- No encryption keys on our servers
-- Subpoenas cannot reveal user data we don't have
+### 2. Content Privacy Architecture
+- Email bodies never stored on servers
+- Only headers and metadata for functionality
+- Content encryption keys stay client-side
 
-### 3. Provider-Level Security
-- Leverages Google/Microsoft's security infrastructure
-- No additional attack surface from our servers
-- OAuth tokens never leave the user's control
+### 3. Backend-for-Frontend Security
+- Leverages provider security (Google/Microsoft)
+- Server handles auth and coordination securely
+- OAuth tokens managed server-side with proper refresh
 
-### 4. API Key Isolation
-- Each user manages own API keys
-- Keys encrypted with user passphrase
-- No central API key = no mass breach risk
+### 4. Layered Security Model
+- Server authentication with Supabase Auth
+- Client-side encryption for sensitive content
+- Minimal server exposure with maximum functionality
 
-## Minimal Backend Security
+## Backend Security Layer
 
-### Auth Coordinator (Vercel Edge)
+### Supabase Authentication
 ```typescript
-// Only coordinates PKCE flow, never sees tokens
-export async function POST(request: Request) {
-  const { code_challenge, state } = await request.json();
+// Secure JWT-based authentication with refresh tokens
+export async function authenticateUser(request: Request) {
+  const token = request.headers.get('Authorization')?.replace('Bearer ', '');
   
-  // Generate secure state parameter
-  const stateToken = crypto.randomBytes(32).toString('hex');
+  if (!token) {
+    return { error: 'No token provided' };
+  }
   
-  // Store state temporarily (5 min TTL)
-  await redis.setex(`state:${stateToken}`, 300, JSON.stringify({
-    code_challenge,
-    timestamp: Date.now()
-  }));
-  
-  return new Response(JSON.stringify({ state: stateToken }));
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return { error: 'Invalid token' };
+    }
+    
+    return { user };
+  } catch (error) {
+    return { error: 'Token verification failed' };
+  }
 }
 ```
 
 ### Rate Limiting (Upstash Redis)
 ```typescript
-// Prevent API abuse without storing user data
-export async function checkRateLimit(identifier: string) {
-  const key = `rate:${identifier}`;
+// Prevent API abuse with user-specific limits
+export async function checkRateLimit(userId: string) {
+  const key = `rate:${userId}`;
   const current = await redis.incr(key);
   
   if (current === 1) {
     await redis.expire(key, 3600); // 1 hour window
   }
   
-  return current <= 1000; // 1000 requests/hour
+  return current <= 1000; // 1000 requests/hour per user
 }
 ```
 
@@ -403,4 +414,4 @@ class SecureWindowSync {
 
 ---
 
-**Remember**: In our client-first architecture, the browser is the fortress. We've eliminated the traditional attack surface by removing the server-side honeypot entirely. Your emails are as secure as your device.
+**Remember**: In our hybrid architecture, we balance security and functionality. Email content stays client-side for privacy, while metadata on servers enables powerful features. We've minimized server attack surface while maintaining full functionality.

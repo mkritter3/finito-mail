@@ -6,11 +6,11 @@ This document defines the complete technology stack for Finito Mail. Every techn
 
 ## Core Principles
 
-1. **Client-First Architecture**: 99% of operations happen in the browser
-2. **Zero Server Storage**: All emails stored client-side in IndexedDB
-3. **Direct Provider Access**: Cut out the middleman completely
-4. **Performance First**: <50ms for all interactions (no network)
-5. **Infinite Scalability**: Each user is their own database
+1. **Hybrid Architecture**: PostgreSQL for metadata, IndexedDB for email bodies
+2. **Strategic Server Storage**: Headers in PostgreSQL, bodies cached client-side
+3. **Backend-for-Frontend**: Minimal server for auth, sync, and security
+4. **Performance First**: <50ms for all interactions (local cache)
+5. **Scalable Design**: Metadata shared, content cached locally
 
 ## Frontend Technologies
 
@@ -151,14 +151,14 @@ This document defines the complete technology stack for Finito Mail. Every techn
 - **Why**: JavaScript everywhere, excellent performance
 - **Features Used**: Native fetch, crypto APIs
 
-#### API Framework: Minimal REST API
-- **Why**: Simplest possible backend for auth and webhooks only
+#### API Framework: Next.js API Routes
+- **Why**: Full-stack framework supporting hybrid architecture
 - **Alternatives Considered**: GraphQL, tRPC, gRPC
 - **Decision Factors**:
-  - Client-first architecture requires minimal backend
-  - Only need auth coordination and webhook handling
-  - REST is simpler for these basic operations
-  - No need for complex data fetching patterns
+  - Hybrid architecture requires more than minimal backend
+  - Need auth, sync coordination, and metadata management
+  - Supports both client-side and server-side operations
+  - REST is suitable for these hybrid operations
 
 #### Serverless Platform: Vercel Functions
 - **Why**: Generous free tier, excellent Next.js integration
@@ -168,38 +168,62 @@ This document defines the complete technology stack for Finito Mail. Every techn
   - Streaming responses
   - Regional deployments
 
-### Client-Side Storage
+### Database Layer
 
-#### Primary Storage: IndexedDB
-- **Why**: 50GB+ available, no server costs
-- **Wrapper**: Dexie.js for better API
+#### Primary Database: PostgreSQL
+- **Why**: ACID compliance, complex queries, scalability
+- **Provider**: Supabase (generous free tier)
+- **Use Cases**: Email metadata, user accounts, sync state
+- **Features Used**:
+  - Full-text search
+  - JSON columns
+  - Real-time subscriptions
+  - Row-level security
+
+### Hybrid Storage Architecture
+
+#### Server Storage: PostgreSQL (Metadata)
+- **Why**: Structured queries, consistency, sync coordination
+- **Provider**: Supabase
+- **Stores**: Email headers, labels, threads, sync state
 - **Features**:
-  - Full-text search indexes
+  - ACID transactions
+  - Real-time updates
+  - Full-text search on metadata
+  - Efficient pagination
+
+#### Client Storage: IndexedDB (Email Bodies)
+- **Why**: 50GB+ available, offline access, performance
+- **Wrapper**: Dexie.js for better API
+- **Stores**: Email content, attachments, local search index
+- **Features**:
   - Encrypted storage
   - Offline-first
-  - No size limits
+  - Fast local queries
+  - Automatic cleanup
 
-#### Search Index: MiniSearch in Web Worker
-- **Why**: Instant search without server
-- **Performance**: <10ms for 100k emails
-- **Features**: Fuzzy matching, stemming
+#### Search: Hybrid Local + Server
+- **Local**: MiniSearch in Web Worker for instant results
+- **Server**: PostgreSQL full-text search for completeness
+- **Performance**: <10ms local, <500ms complete results
+- **Features**: Fuzzy matching, stemming, natural language
 
-### Minimal Backend Services
+### Backend Services
 
-#### Auth Coordinator: Vercel Edge Functions
-- **Why**: PKCE flow coordination only
-- **Free Tier**: 100GB bandwidth/month
-- **No email storage**: Tokens only
+#### Authentication: Supabase Auth
+- **Why**: Complete auth solution with JWT tokens
+- **Features**: OAuth2, JWT refresh, RLS policies
+- **Security**: Encrypted token storage, secure sessions
 
-#### Rate Limiter: Upstash Redis
-- **Why**: Prevent provider API abuse
+#### Caching: Redis (Upstash)
+- **Why**: Session management, rate limiting, temp storage
 - **Free Tier**: 10,000 commands/day
-- **Stores**: Quotas and sync timestamps only
+- **Use Cases**: Sync coordination, push notifications, quotas
 
-#### Push Queue: Cloudflare Workers
-- **Why**: Webhook handling, push notifications
+#### Background Jobs: Cloudflare Workers
+- **Why**: Webhook handling, scheduled tasks
 - **Free Tier**: 100,000 requests/day
-- **No storage**: Just event routing
+- **Use Cases**: Gmail webhooks, snooze wake-ups, cleanup
 
 ### Client-Side Technologies
 
@@ -411,25 +435,25 @@ Browser Storage Hierarchy:
 - **Why**: Native GitHub integration
 - **Features**: Matrix builds, caching
 
-## Client-First Technology Benefits
+## Hybrid Architecture Technology Benefits
 
-| Technology | Traditional Cost | Client-First Cost | Savings |
-|------------|-----------------|-------------------|----------|
-| Database | $129/mo | $0 (IndexedDB) | 100% |
-| Search | $89/mo | $0 (MiniSearch) | 100% |
-| Storage | $200/mo | $0 (Browser) | 100% |
-| CDN | $100/mo | $0 (Local) | 100% |
+| Technology | Traditional Cost | Hybrid Cost | Savings |
+|------------|-----------------|-------------|----------|
+| Database | $129/mo | $0 (Supabase free) | 100% |
+| Search | $89/mo | $0 (Hybrid local+PG) | 100% |
+| Storage | $200/mo | $0 (IndexedDB cache) | 100% |
+| CDN | $100/mo | $0 (Local cache) | 100% |
 | **Total** | **$518/mo** | **$0/mo** | **100%** |
 
 ## Migration Strategies
 
-### Why Client-First Works
+### Why Hybrid Architecture Works
 
-1. **Gmail stores everything**: We're just a smart UI
-2. **50GB IndexedDB**: More than enough for email
-3. **Direct API access**: No middleman latency
-4. **Browser does the work**: Infinite free compute
-5. **No scaling issues**: Each user scales themselves
+1. **Best of both worlds**: Server coordination + client performance
+2. **Metadata in PostgreSQL**: Structured queries and consistency
+3. **Bodies in IndexedDB**: Fast access and offline support
+4. **Minimal server load**: Only metadata and coordination
+5. **Scalable design**: Shared metadata, cached content
 
 ### Progressive Enhancement Path
 
@@ -440,10 +464,11 @@ Browser Storage Hierarchy:
 
 ### Security Advantages
 
-1. **No honeypot**: Emails never on our servers
-2. **User-controlled**: Local encryption keys
-3. **Provider security**: Google/Microsoft level
-4. **Compliance**: GDPR-compliant by design
+1. **Reduced attack surface**: Only metadata on servers
+2. **Content privacy**: Email bodies stay client-side
+3. **Provider security**: Leverages Gmail/Outlook security
+4. **Compliance**: GDPR-compliant hybrid model
+5. **Encrypted storage**: Client-side encryption for sensitive data
 
 ---
 

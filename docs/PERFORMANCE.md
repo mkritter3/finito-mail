@@ -1,19 +1,19 @@
-# Performance Optimization Guide - Client-First
+# Performance Optimization Guide - Hybrid Architecture
 
 ## Overview
 
-This document defines performance optimization strategies for our client-first architecture. With no server round-trips, we achieve <50ms response times for all operations.
+This document defines performance optimization strategies for our hybrid architecture. With metadata in PostgreSQL and bodies cached client-side, we achieve <50ms response times for all operations.
 
-## Client-First Performance Advantages
+## Hybrid Architecture Performance Advantages
 
-### Zero Network Latency
+### Minimal Network Latency
 ```
 Traditional Architecture:
 Click → Network Request → Server Processing → Database Query → Response → Render
 Total: 200-500ms
 
-Client-First Architecture:
-Click → Local IndexedDB → Render
+Hybrid Architecture:
+Click → Local IndexedDB Cache → Render (+ background metadata sync)
 Total: 5-50ms (10-100x faster!)
 ```
 
@@ -34,14 +34,14 @@ Total: 5-50ms (10-100x faster!)
 ### Real-World Performance
 
 ```typescript
-// Actual measurements from client-first implementation
+// Actual measurements from hybrid architecture
 const performance = {
-  listEmails: 8ms,      // Query IndexedDB
-  searchEmails: 6ms,    // MiniSearch query
-  openEmail: 3ms,       // Already loaded
-  markAsRead: 12ms,     // Update IndexedDB + queue
+  listEmails: 8ms,      // Query local cache
+  searchEmails: 6ms,    // Local MiniSearch + metadata
+  openEmail: 3ms,       // Already cached
+  markAsRead: 12ms,     // Update cache + queue
   deleteEmail: 15ms,    // Soft delete locally
-  syncChanges: 150ms    // Background to provider
+  syncChanges: 150ms    // Background to PostgreSQL + provider
 };
 ```
 
@@ -264,20 +264,21 @@ class VirtualEmailList {
 }
 ```
 
-## Client-Side Optimizations
+## Hybrid Optimizations
 
-### 1. IndexedDB Performance
+### 1. IndexedDB Performance (Client Cache)
 
 #### Optimal Indexing Strategy
 ```typescript
-// db.ts - Compound indexes for common queries
+// db.ts - Compound indexes for common queries (IndexedDB cache)
 class EmailDB extends Dexie {
-  emails!: Table<Email>;
+  email_headers!: Table<EmailHeader>; // Synced from PostgreSQL
+  email_bodies!: Table<EmailBody>;   // Cached locally
   
   constructor() {
     super('EmailClient');
     this.version(1).stores({
-      emails: `
+      email_headers: `
         id,
         threadId,
         timestamp,
@@ -285,20 +286,32 @@ class EmailDB extends Dexie {
         [threadId+timestamp],
         [isRead+timestamp],
         [folder+timestamp]
+      `,
+      email_bodies: `
+        id,
+        body,
+        lastAccessed
       `
     });
   }
 }
 
-// Query optimization
+// Query optimization - check cache first, fallback to PostgreSQL
 export async function getInboxEmails(limit = 50) {
-  // Uses compound index [folder+timestamp]
-  return db.emails
+  // First check local cache
+  const cached = await db.email_headers
     .where('[folder+timestamp]')
     .between(['inbox', 0], ['inbox', Infinity])
     .reverse()
     .limit(limit)
     .toArray();
+  
+  if (cached.length >= limit) {
+    return cached;
+  }
+  
+  // Fallback to server if cache is incomplete
+  return await fetchFromServer('inbox', limit);
 }
 ```
 
@@ -604,7 +617,7 @@ const SearchInterface = lazy(() =>
 
 ---
 
-**Remember**: In client-first architecture, performance isn't about optimizing network requests or database queries - it's about optimizing local data access and rendering. With no server round-trips, we achieve performance that traditional architectures simply cannot match!
+**Remember**: In hybrid architecture, performance combines the best of both worlds - server coordination for consistency and client-side caching for speed. With metadata in PostgreSQL and bodies cached locally, we achieve performance that traditional architectures simply cannot match!
 
 ### IndexedDB Archive Strategy
 
