@@ -8,7 +8,101 @@ This document outlines the security patterns and implementations for Finito Mail
 OAuth access tokens expire after 1 hour. Without proper refresh handling, users would need to re-authenticate hourly, creating a terrible user experience.
 
 ### The Solution
-Implement automatic token refresh with secure backend handling of refresh tokens.
+Implement automatic token refresh with secure backend handling of refresh tokens. **CRITICAL: Refresh tokens MUST NEVER be stored client-side.**
+
+#### Refresh Token Storage Strategy
+
+```typescript
+// apps/auth/src/token-storage.ts
+import { db } from './database'; // PostgreSQL
+import { encrypt, decrypt } from './encryption';
+
+export class RefreshTokenStorage {
+  /**
+   * Store refresh token securely in backend database
+   * NEVER send to client or store in browser
+   */
+  async storeRefreshToken(
+    userId: string, 
+    refreshToken: string,
+    provider: 'gmail' | 'outlook'
+  ) {
+    const encrypted = await encrypt(refreshToken, process.env.ENCRYPTION_KEY!);
+    
+    await db.user_tokens.upsert({
+      user_id: userId,
+      provider,
+      refresh_token_encrypted: encrypted.ciphertext,
+      refresh_token_iv: encrypted.iv,
+      updated_at: new Date()
+    });
+  }
+  
+  async getRefreshToken(userId: string, provider: string) {
+    const record = await db.user_tokens.findOne({ 
+      user_id: userId, 
+      provider 
+    });
+    
+    if (!record) return null;
+    
+    return decrypt(
+      record.refresh_token_encrypted,
+      record.refresh_token_iv,
+      process.env.ENCRYPTION_KEY!
+    );
+  }
+}
+```
+
+#### Backend Token Refresh Endpoint
+
+```typescript
+// apps/auth/api/auth/refresh/route.ts
+export async function POST(request: Request) {
+  const session = await getSession(request);
+  if (!session?.userId) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+  
+  try {
+    // Get refresh token from secure backend storage
+    const refreshToken = await tokenStorage.getRefreshToken(
+      session.userId,
+      session.provider
+    );
+    
+    if (!refreshToken) {
+      return new Response('Session expired', { status: 401 });
+    }
+    
+    // Use refresh token to get new access token
+    const tokens = await oauth.refreshAccessToken(refreshToken);
+    
+    // Update stored refresh token if provider rotated it
+    if (tokens.refresh_token !== refreshToken) {
+      await tokenStorage.storeRefreshToken(
+        session.userId,
+        tokens.refresh_token,
+        session.provider
+      );
+    }
+    
+    // Return ONLY the access token to client
+    return new Response(JSON.stringify({
+      access_token: tokens.access_token,
+      expires_in: tokens.expires_in,
+      // NEVER include refresh_token in response!
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+  } catch (error) {
+    console.error('Token refresh failed:', error);
+    return new Response('Token refresh failed', { status: 500 });
+  }
+}
+```
 
 ```typescript
 // packages/provider-client/src/auth/token-manager.ts
