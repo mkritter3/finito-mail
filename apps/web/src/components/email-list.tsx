@@ -4,6 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useRef, useEffect, useState } from 'react'
 import { EmailRow } from './email-row'
 import { SyncStatus } from './sync-status'
+import { BulkActionsToolbar } from './bulk-actions-toolbar'
 import type { EmailFolder } from '@finito/types'
 
 interface EmailListProps {
@@ -94,6 +95,9 @@ export function EmailList({ folder }: EmailListProps) {
       <div className="p-4 border-b border-border">
         <SyncStatus />
       </div>
+
+      {/* Bulk Actions Toolbar */}
+      <BulkActionsToolbar />
 
       {/* Email List */}
       <div ref={parentRef} className="flex-1 overflow-auto">

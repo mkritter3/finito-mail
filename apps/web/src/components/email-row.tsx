@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@finito/ui'
+import { Checkbox } from '@finito/ui/checkbox'
 import { useEmailPrefetch } from '@/hooks/use-email-prefetch'
 import { useEmailStore } from '@/stores/email-store'
 
@@ -44,27 +45,60 @@ export function EmailRow({ email }: EmailRowProps) {
   const displayName = fromAddress?.name || fromAddress?.email || 'Unknown'
   const avatar = fromAddress?.name?.[0] || fromAddress?.email?.[0] || 'U'
   const { prefetchEmail } = useEmailPrefetch()
-  const setSelectedEmailId = useEmailStore((state) => state.setSelectedEmailId)
+  const {
+    setSelectedEmailId,
+    toggleEmailSelection,
+    selectedEmailIds,
+    getEmailWithOptimisticUpdates
+  } = useEmailStore()
+
+  // Apply optimistic updates to email display
+  const displayEmail = getEmailWithOptimisticUpdates(email)
+  const isSelected = selectedEmailIds.has(email.gmail_message_id)
 
   const handleMouseEnter = () => {
     // Prefetch email content on hover for instant loading
     prefetchEmail(email.gmail_message_id)
   }
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    // Don't trigger email selection when clicking checkbox
+    if ((e.target as HTMLElement).closest('[data-checkbox]')) {
+      return
+    }
     setSelectedEmailId(email.gmail_message_id)
+  }
+
+  const handleCheckboxChange = (checked: boolean) => {
+    toggleEmailSelection(email.gmail_message_id)
   }
 
   return (
     <div
       data-testid="email-row"
       className={cn(
-        'email-row flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-border hover:bg-accent/50',
-        !email.is_read && 'font-semibold'
+        'email-row group flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-border hover:bg-accent/50 transition-colors',
+        !displayEmail.is_read && 'font-semibold',
+        isSelected && 'bg-blue-50 border-blue-200',
+        displayEmail.deleted && 'opacity-50 line-through',
+        displayEmail.archived && 'opacity-75'
       )}
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}
     >
+      {/* Checkbox */}
+      <div
+        data-checkbox
+        className="flex-shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={handleCheckboxChange}
+          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+        />
+      </div>
+
       {/* Avatar */}
       <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
         {avatar.toUpperCase()}
@@ -80,13 +114,13 @@ export function EmailRow({ email }: EmailRowProps) {
             {formatDistanceToNow(email.received_at)}
           </span>
         </div>
-        <div className="text-sm truncate mb-1">{email.subject || '(No Subject)'}</div>
-        <div className="text-xs text-muted-foreground truncate">{email.snippet}</div>
+        <div className="text-sm truncate mb-1">{displayEmail.subject || '(No Subject)'}</div>
+        <div className="text-xs text-muted-foreground truncate">{displayEmail.snippet}</div>
       </div>
 
       {/* Indicators */}
       <div className="flex-shrink-0 flex items-center gap-2">
-        {!email.is_read && (
+        {!displayEmail.is_read && (
           <div className="w-2 h-2 rounded-full bg-blue-500"></div>
         )}
       </div>
