@@ -26,29 +26,35 @@ Finito Mail uses a **hybrid architecture** matching Inbox Zero's approach:
 
 ### 📅 Phase 1: Foundation & Sync (Weeks 1-5)
 
-#### Weeks 1-2: Infrastructure & Gmail API
+#### Weeks 1-2: Infrastructure & Gmail API + Security
 ```typescript
 // Priority tasks
 - [ ] Set up monorepo with Turborepo
 - [ ] Configure PostgreSQL schema for metadata
 - [ ] Implement OAuth2 PKCE flow with token encryption
+- [ ] **OAuth token refresh mechanism (SecureTokenManager)**
+- [ ] **XSS protection with CSP headers and DOMPurify**
 - [ ] Create IndexedDB schema with Dexie.js
 - [ ] Gmail API client with retry logic
+- [ ] **Client-side rate limiting with Upstash Redis**
 - [ ] Batch API operations (max 50/batch)
 - [ ] Rate limiting with exponential backoff
 - [ ] Field filtering for bandwidth optimization
 ```
 
 **Key Deliverables:**
-- Working auth flow with encrypted token storage
+- Working auth flow with automatic token refresh
+- XSS protection and security headers in place
 - Gmail API integration with proper error handling
 - Basic database schemas ready
 
-#### Weeks 3-4: Progressive Sync (CRITICAL PATH)
+#### Weeks 3-4: Progressive Sync + Resilience (CRITICAL PATH)
 ```typescript
 // This is the most complex component - allocate 2 full weeks
 - [ ] Web Worker for background sync
 - [ ] Progressive sync strategy implementation
+- [ ] **Circuit breaker pattern for Gmail API calls**
+- [ ] **Basic quota tracking (250 units/user/second)**
 - [ ] Sync checkpoint system in PostgreSQL
 - [ ] Graceful resumption of failed syncs
 - [ ] History API integration with gap handling
@@ -59,6 +65,8 @@ Finito Mail uses a **hybrid architecture** matching Inbox Zero's approach:
 
 **Success Criteria:**
 - Can sync 50k+ emails without failure
+- Circuit breaker prevents cascading failures
+- Quota tracking prevents hitting limits
 - Resumes correctly after interruption
 - Handles Gmail history gaps gracefully
 - Progress is visible and accurate
@@ -76,10 +84,11 @@ Finito Mail uses a **hybrid architecture** matching Inbox Zero's approach:
 
 ### 📅 Phase 2: Core Features (Weeks 6-10)
 
-#### Weeks 6-7: Modifier Queue (CRITICAL PATH)
+#### Weeks 6-7: Modifier Queue + Performance (CRITICAL PATH)
 ```typescript
 // The heart of reliability - allocate 2 full weeks
 - [ ] Modifier interface and base class
+- [ ] **Memory management system (MemoryManager)**
 - [ ] Idempotency with unique operation IDs
 - [ ] Common modifiers (archive, delete, mark read, star)
 - [ ] Offline queue persistence in IndexedDB
@@ -91,26 +100,30 @@ Finito Mail uses a **hybrid architecture** matching Inbox Zero's approach:
 
 **Success Criteria:**
 - Actions feel instant (<50ms)
+- Memory pressure handled gracefully
 - Works perfectly offline
 - Syncs reliably when back online
 - No duplicate operations
 
-#### Week 8: Snooze Feature
+#### Week 8: Snooze Feature + Data Optimization
 ```typescript
-// Time-based email management
+// Time-based email management + performance
 - [ ] Redis sorted sets setup
+- [ ] **IndexedDB optimization (DatabaseOptimizer)**
 - [ ] Snooze API endpoints
 - [ ] Snooze UI with preset options
 - [ ] Wake-up cron service (Cloudflare)
 - [ ] Snooze view in UI
 - [ ] Integration with modifier queue
+- [ ] **Archive emails >90 days automatically**
 ```
 
-#### Weeks 9-10: Push Notifications & Search
+#### Weeks 9-10: Push Notifications & Search + Integrity
 ```typescript
 // Real-time updates and complete search - 2 weeks
 - [ ] Google Cloud Pub/Sub setup
 - [ ] Gmail watch request implementation
+- [ ] **Data integrity validation (DataIntegrityValidator)**
 - [ ] Cloudflare webhook handler
 - [ ] WebSocket connection management
 - [ ] Fallback polling strategy
@@ -121,6 +134,7 @@ Finito Mail uses a **hybrid architecture** matching Inbox Zero's approach:
 
 **Success Criteria:**
 - Email changes appear within seconds
+- Data consistency validated regularly
 - Search returns complete results
 - Graceful degradation if push fails
 

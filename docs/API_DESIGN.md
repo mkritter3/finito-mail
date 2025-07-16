@@ -463,3 +463,166 @@ The hybrid approach gives us the best of both worlds: instant performance from l
 ---
 
 **Cost Summary**: The hybrid architecture costs ~$0.08-0.30/user/month while enabling critical features like cross-device sync, complete search, and time-based operations. This is still 95%+ cheaper than traditional server-heavy architectures.
+
+## Error Handling
+
+All endpoints follow consistent error response format:
+
+```typescript
+interface ErrorResponse {
+  error: {
+    code: string;          // e.g., 'RATE_LIMIT_EXCEEDED'
+    message: string;       // Human-readable message
+    details?: any;         // Additional context
+    retryAfter?: number;   // For rate limits
+  };
+  status: number;          // HTTP status code
+}
+```
+
+### Common Error Codes
+
+| Code | Status | Description |
+|------|--------|-------------|
+| `UNAUTHORIZED` | 401 | Missing or invalid auth |
+| `FORBIDDEN` | 403 | Insufficient permissions |
+| `NOT_FOUND` | 404 | Resource not found |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
+| `PROVIDER_ERROR` | 502 | Gmail/Outlook API error |
+| `CIRCUIT_OPEN` | 503 | Service temporarily unavailable |
+| `INTERNAL_ERROR` | 500 | Server error |
+
+## Resilience Patterns
+
+### Circuit Breaker
+
+Prevents cascading failures when provider APIs are down:
+
+```typescript
+// packages/core/src/resilience/circuit-breaker.ts
+export class CircuitBreaker {
+  private failures = 0;
+  private lastFailTime = 0;
+  private state: 'closed' | 'open' | 'half-open' = 'closed';
+  
+  constructor(
+    private readonly options: {
+      failureThreshold: number;  // e.g., 5 failures
+      resetTimeout: number;      // e.g., 60000ms (1 minute)
+      halfOpenRetries: number;   // e.g., 3 test requests
+    }
+  ) {}
+  
+  async execute<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.state === 'open') {
+      const elapsed = Date.now() - this.lastFailTime;
+      if (elapsed > this.options.resetTimeout) {
+        this.state = 'half-open';
+      } else {
+        throw new Error('Circuit breaker is open');
+      }
+    }
+    
+    try {
+      const result = await operation();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+  
+  private onSuccess() {
+    if (this.state === 'half-open') {
+      this.state = 'closed';
+    }
+    this.failures = 0;
+  }
+  
+  private onFailure() {
+    this.failures++;
+    this.lastFailTime = Date.now();
+    
+    if (this.failures >= this.options.failureThreshold) {
+      this.state = 'open';
+    }
+  }
+}
+
+// Usage in API routes
+const gmailCircuitBreaker = new CircuitBreaker({
+  failureThreshold: 5,
+  resetTimeout: 60000,
+  halfOpenRetries: 3
+});
+
+export async function searchEmails(query: string) {
+  return gmailCircuitBreaker.execute(async () => {
+    return gmailClient.users.messages.list({
+      userId: 'me',
+      q: query
+    });
+  });
+}
+```
+
+### Retry with Exponential Backoff
+
+For transient failures:
+
+```typescript
+export async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  options: {
+    maxRetries?: number;
+    initialDelay?: number;
+    maxDelay?: number;
+    factor?: number;
+  } = {}
+): Promise<T> {
+  const {
+    maxRetries = 3,
+    initialDelay = 1000,
+    maxDelay = 30000,
+    factor = 2
+  } = options;
+  
+  let lastError: Error;
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Don't retry on non-retryable errors
+      if (\!isRetryable(error)) {
+        throw error;
+      }
+      
+      if (i < maxRetries - 1) {
+        const delay = Math.min(
+          initialDelay * Math.pow(factor, i),
+          maxDelay
+        );
+        
+        // Add jitter to prevent thundering herd
+        const jitter = Math.random() * 0.3 * delay;
+        await sleep(delay + jitter);
+      }
+    }
+  }
+  
+  throw lastError\!;
+}
+
+function isRetryable(error: any): boolean {
+  // Retry on network errors and 5xx status codes
+  return (
+    error.code === 'ECONNRESET' ||
+    error.code === 'ETIMEDOUT' ||
+    (error.response?.status >= 500 && error.response?.status < 600)
+  );
+}
+```

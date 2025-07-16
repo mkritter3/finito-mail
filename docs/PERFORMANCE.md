@@ -92,6 +92,178 @@ class PrintOptimizer {
 - **Print**: Pagination and lazy image loading
 - **Memory**: Process in chunks to avoid OOM
 
+## Memory Management
+
+### JavaScript Heap Management
+
+Prevent browser crashes when handling large email datasets:
+
+```typescript
+// packages/core/src/memory/memory-manager.ts
+export class MemoryManager {
+  private memoryPressureCallbacks: Set<() => void> = new Set();
+  private lastGC = Date.now();
+  private readonly GC_INTERVAL = 300000; // 5 minutes
+  
+  constructor() {
+    this.startMemoryMonitoring();
+  }
+  
+  private startMemoryMonitoring() {
+    // Check memory every 10 seconds
+    setInterval(() => {
+      this.checkMemoryPressure();
+    }, 10000);
+    
+    // Listen for memory pressure events (Chrome 91+)
+    if ('memory' in performance && 'addEventListener' in performance.memory) {
+      (performance.memory as any).addEventListener('pressure', (event: any) => {
+        console.log('Memory pressure detected:', event.level);
+        this.handleMemoryPressure(event.level);
+      });
+    }
+  }
+  
+  private async checkMemoryPressure() {
+    if (!('memory' in performance)) return;
+    
+    const memory = (performance as any).memory;
+    const usageRatio = memory.usedJSHeapSize / memory.jsHeapSizeLimit;
+    
+    console.log(`Memory usage: ${(usageRatio * 100).toFixed(1)}%`);
+    
+    if (usageRatio > 0.9) {
+      console.warn('Critical memory pressure:', usageRatio);
+      await this.handleMemoryPressure('critical');
+    } else if (usageRatio > 0.7) {
+      await this.handleMemoryPressure('moderate');
+    }
+  }
+  
+  private async handleMemoryPressure(level: 'moderate' | 'critical') {
+    // Notify all registered callbacks
+    this.memoryPressureCallbacks.forEach(callback => callback());
+    
+    if (level === 'critical') {
+      await this.performAggressiveCleanup();
+    } else {
+      await this.performGentleCleanup();
+    }
+    
+    // Request garbage collection if possible
+    this.requestGarbageCollection();
+  }
+  
+  private async performAggressiveCleanup() {
+    console.log('Performing aggressive memory cleanup');
+    
+    // Clear all non-essential data
+    await db.email_bodies.clear();
+    
+    // Clear search index
+    if (window.searchWorker) {
+      window.searchWorker.postMessage({ type: 'CLEAR_INDEX' });
+    }
+    
+    // Clear image caches
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames
+          .filter(name => name.includes('images'))
+          .map(name => caches.delete(name))
+      );
+    }
+  }
+  
+  private async performGentleCleanup() {
+    console.log('Performing gentle memory cleanup');
+    
+    // Clear old email bodies (not viewed in last hour)
+    const cutoff = Date.now() - 3600000;
+    await db.email_bodies
+      .where('lastAccessed')
+      .below(cutoff)
+      .delete();
+  }
+  
+  registerMemoryPressureCallback(callback: () => void) {
+    this.memoryPressureCallbacks.add(callback);
+    
+    return () => {
+      this.memoryPressureCallbacks.delete(callback);
+    };
+  }
+}
+```
+
+### Memory-Efficient Data Loading
+
+```typescript
+// Use weak references for cached data
+class EmailCache {
+  private cache = new Map<string, WeakRef<Email>>();
+  private registry = new FinalizationRegistry((emailId: string) => {
+    console.log(`Email ${emailId} was garbage collected`);
+    this.cache.delete(emailId);
+  });
+  
+  set(emailId: string, email: Email) {
+    const ref = new WeakRef(email);
+    this.cache.set(emailId, ref);
+    this.registry.register(email, emailId);
+  }
+  
+  get(emailId: string): Email | undefined {
+    const ref = this.cache.get(emailId);
+    if (!ref) return undefined;
+    
+    const email = ref.deref();
+    if (!email) {
+      this.cache.delete(emailId);
+      return undefined;
+    }
+    
+    return email;
+  }
+}
+```
+
+### Virtual Scrolling for Large Lists
+
+```typescript
+// Only render visible emails to save memory
+class VirtualEmailList {
+  private readonly ROW_HEIGHT = 72;
+  private readonly BUFFER_SIZE = 5;
+  
+  private visibleRange = { start: 0, end: 0 };
+  private renderedEmails = new Map<number, HTMLElement>();
+  
+  updateVisibleRange(scrollTop: number, containerHeight: number) {
+    const start = Math.floor(scrollTop / this.ROW_HEIGHT) - this.BUFFER_SIZE;
+    const end = Math.ceil((scrollTop + containerHeight) / this.ROW_HEIGHT) + this.BUFFER_SIZE;
+    
+    this.visibleRange = {
+      start: Math.max(0, start),
+      end: Math.min(this.totalEmails, end)
+    };
+    
+    this.renderVisibleEmails();
+    this.cleanupInvisibleEmails();
+  }
+  
+  private cleanupInvisibleEmails() {
+    for (const [index, element] of this.renderedEmails) {
+      if (index < this.visibleRange.start || index > this.visibleRange.end) {
+        element.remove();
+        this.renderedEmails.delete(index);
+      }
+    }
+  }
+}
+```
+
 ## Client-Side Optimizations
 
 ### 1. IndexedDB Performance
@@ -433,3 +605,177 @@ const SearchInterface = lazy(() =>
 ---
 
 **Remember**: In client-first architecture, performance isn't about optimizing network requests or database queries - it's about optimizing local data access and rendering. With no server round-trips, we achieve performance that traditional architectures simply cannot match!
+
+### IndexedDB Archive Strategy
+
+Archive old emails to maintain performance:
+
+```typescript
+// packages/storage/src/performance/db-optimizer.ts
+export class DatabaseOptimizer {
+  private readonly ARCHIVE_THRESHOLD_DAYS = 90;
+  private readonly CLEANUP_BATCH_SIZE = 1000;
+  private readonly COMPRESSION_THRESHOLD_SIZE = 1024 * 1024; // 1MB
+  
+  async optimizeStorage(): Promise<OptimizationResult> {
+    const result: OptimizationResult = {
+      archivedCount: 0,
+      compressedCount: 0,
+      deletedCount: 0,
+      spaceSaved: 0
+    };
+    
+    // Archive old emails
+    result.archivedCount = await this.archiveOldEmails();
+    
+    // Compress large email bodies
+    result.compressedCount = await this.compressLargeEmails();
+    
+    // Clean orphaned attachments
+    result.deletedCount = await this.cleanOrphanedAttachments();
+    
+    // Rebuild indexes for better performance
+    await this.rebuildIndexes();
+    
+    return result;
+  }
+  
+  private async archiveOldEmails(): Promise<number> {
+    const cutoffDate = Date.now() - (this.ARCHIVE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000);
+    let archived = 0;
+    
+    await db.transaction('rw', db.email_headers, db.email_bodies, db.archived_emails, async () => {
+      // Move old emails to archived table in batches
+      let batch;
+      do {
+        batch = await db.email_headers
+          .where('date')
+          .below(cutoffDate)
+          .limit(this.CLEANUP_BATCH_SIZE)
+          .toArray();
+        
+        if (batch.length > 0) {
+          // Compress and move to archive
+          for (const header of batch) {
+            const body = await db.email_bodies.get(header.id);
+            if (body) {
+              const compressed = await this.compressEmailBody(body);
+              await db.archived_emails.add({
+                ...header,
+                bodyCompressed: compressed,
+                archivedAt: Date.now()
+              });
+              
+              await db.email_bodies.delete(header.id);
+              await db.email_headers.delete(header.id);
+              archived++;
+            }
+          }
+        }
+      } while (batch.length === this.CLEANUP_BATCH_SIZE);
+    });
+    
+    return archived;
+  }
+  
+  private async compressEmailBody(body: EmailBody): Promise<ArrayBuffer> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(JSON.stringify(body));
+    
+    // Use CompressionStream API if available
+    if ('CompressionStream' in window) {
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(data);
+          controller.close();
+        }
+      });
+      
+      const compressedStream = stream.pipeThrough(new CompressionStream('gzip'));
+      const chunks: Uint8Array[] = [];
+      const reader = compressedStream.getReader();
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      
+      return concatenateArrayBuffers(chunks);
+    }
+    
+    // Fallback to pako or similar
+    return pako.gzip(data).buffer;
+  }
+}
+```
+
+## Data Integrity Checks
+
+Ensure consistency between local and server data:
+
+```typescript
+// packages/core/src/integrity/data-validator.ts
+export class DataIntegrityValidator {
+  async validateDataIntegrity(): Promise<ValidationReport> {
+    const report: ValidationReport = {
+      timestamp: new Date(),
+      errors: [],
+      warnings: [],
+      stats: {}
+    };
+    
+    // Check email count consistency
+    await this.validateEmailCounts(report);
+    
+    // Check for orphaned attachments
+    await this.validateAttachments(report);
+    
+    // Validate search index
+    await this.validateSearchIndex(report);
+    
+    // Check sync timestamps
+    await this.validateSyncState(report);
+    
+    return report;
+  }
+  
+  private async validateEmailCounts(report: ValidationReport) {
+    // Compare local count with Gmail
+    const localCount = await db.email_headers.count();
+    const gmailCount = await this.getGmailMessageCount();
+    
+    if (Math.abs(localCount - gmailCount) > 10) {
+      report.errors.push({
+        type: 'EMAIL_COUNT_MISMATCH',
+        message: `Local: ${localCount}, Gmail: ${gmailCount}`,
+        severity: 'high',
+        action: 'RESYNC_REQUIRED'
+      });
+    }
+    
+    report.stats.localEmailCount = localCount;
+    report.stats.providerEmailCount = gmailCount;
+  }
+  
+  async repairDataIntegrity(report: ValidationReport): Promise<RepairResult> {
+    const repairs: RepairAction[] = [];
+    
+    for (const error of report.errors) {
+      switch (error.action) {
+        case 'RESYNC_REQUIRED':
+          repairs.push(await this.resyncEmails());
+          break;
+        case 'REBUILD_INDEX':
+          repairs.push(await this.rebuildSearchIndex());
+          break;
+        case 'CLEANUP_RECOMMENDED':
+          repairs.push(await this.cleanupOrphaned());
+          break;
+      }
+    }
+    
+    return { repairs, success: repairs.every(r => r.success) };
+  }
+}
+```

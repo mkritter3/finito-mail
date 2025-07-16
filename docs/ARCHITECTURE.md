@@ -483,6 +483,7 @@ interface ThreadStore {
    └── OAuth tokens encrypted with AES-256-GCM
    └── Master key in Vercel Edge Config
    └── Per-user salt in database
+   └── Automatic token refresh before expiry
 
 3. Email Content
    └── Server-side encryption by default
@@ -492,6 +493,91 @@ interface ThreadStore {
 4. Local Storage
    └── Platform encryption APIs
    └── Additional app-level encryption
+
+5. XSS Protection
+   └── Content Security Policy (CSP) headers
+   └── Trusted Types for DOM manipulation
+   └── DOMPurify for email content sanitization
+```
+
+### OAuth Token Management
+
+```typescript
+// packages/provider-client/src/auth/token-manager.ts
+export class SecureTokenManager {
+  private refreshTimer?: NodeJS.Timeout;
+  
+  async initialize() {
+    const tokens = await this.getStoredTokens();
+    if (tokens) {
+      this.scheduleTokenRefresh(tokens.expiresIn);
+    }
+  }
+  
+  private scheduleTokenRefresh(expiresIn: number) {
+    // Refresh 5 minutes before expiration
+    const refreshIn = (expiresIn - 300) * 1000;
+    
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+    }
+    
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTokens().catch(error => {
+        console.error('Token refresh failed:', error);
+        this.notifyUser('Session expired, please log in again');
+      });
+    }, refreshIn);
+  }
+  
+  private async refreshTokens(): Promise<TokenSet> {
+    // Call backend endpoint - refresh token never leaves server
+    const response = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error('Token refresh failed');
+    }
+    
+    const newTokens = await response.json();
+    await this.securelyStoreTokens(newTokens);
+    this.scheduleTokenRefresh(newTokens.expires_in);
+    
+    return newTokens;
+  }
+}
+```
+
+### Content Security Policy
+
+```typescript
+// apps/web/middleware.ts
+export function middleware(request: NextRequest) {
+  const response = NextResponse.next();
+  
+  // Strict Content Security Policy
+  response.headers.set('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://apis.google.com",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self'",
+    "connect-src 'self' https://gmail.googleapis.com https://graph.microsoft.com wss://api.finito.email",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'"
+  ].join('; '));
+  
+  // Additional security headers
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  
+  return response;
+}
 ```
 
 ### Authentication Flow
@@ -500,9 +586,10 @@ interface ThreadStore {
 2. Redirect to OAuth provider
 3. Receive authorization code
 4. Exchange for tokens
-5. Encrypt tokens with user key
-6. Store encrypted tokens
-7. Set session cookie
+5. Backend stores refresh token securely
+6. Return access token to client
+7. Schedule automatic token refresh
+8. Set secure session cookie
 ```
 
 ## Scalability Architecture
@@ -831,6 +918,255 @@ For the desktop app, the modifier queue can leverage:
 - Background processing without browser limitations
 - Native file system for queue persistence
 - OS-level network state detection
+
+## Resilience Patterns
+
+### Circuit Breaker Pattern
+
+Prevents cascading failures when external services (Gmail/Outlook APIs) experience issues:
+
+```typescript
+// packages/core/src/resilience/circuit-breaker.ts
+export class CircuitBreaker {
+  private failures = 0;
+  private successCount = 0;
+  private lastFailTime = 0;
+  private state: 'closed' | 'open' | 'half-open' = 'closed';
+  
+  constructor(
+    private readonly options: {
+      failureThreshold: number;
+      resetTimeout: number;
+      halfOpenRetries: number;
+      onStateChange?: (state: string) => void;
+    }
+  ) {}
+  
+  async execute<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.state === 'open') {
+      if (Date.now() - this.lastFailTime > this.options.resetTimeout) {
+        this.state = 'half-open';
+        this.options.onStateChange?.('half-open');
+      } else {
+        throw new Error('Circuit breaker is open');
+      }
+    }
+    
+    try {
+      const result = await operation();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+}
+
+// Usage with Gmail API
+const gmailCircuitBreaker = new CircuitBreaker({
+  failureThreshold: 5,
+  resetTimeout: 60000, // 1 minute
+  halfOpenRetries: 3,
+  onStateChange: (state) => {
+    metrics.record('circuit_breaker_state', { service: 'gmail', state });
+  }
+});
+```
+
+### Rate Limiting
+
+Client-side rate limiting to prevent API quota abuse:
+
+```typescript
+// apps/auth/api/middleware/rate-limit.ts
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(100, '60 s'),
+  analytics: true
+});
+
+export async function rateLimitMiddleware(request: Request): Promise<Response | null> {
+  const userId = await getUserId(request);
+  const identifier = `${userId}:${request.method}:${new URL(request.url).pathname}`;
+  
+  const { success, limit, reset, remaining } = await ratelimit.limit(identifier);
+  
+  if (!success) {
+    return new Response('Rate limit exceeded', {
+      status: 429,
+      headers: {
+        'X-RateLimit-Limit': limit.toString(),
+        'X-RateLimit-Remaining': remaining.toString(),
+        'X-RateLimit-Reset': reset.toString(),
+        'Retry-After': Math.floor((reset - Date.now()) / 1000).toString()
+      }
+    });
+  }
+  
+  return null;
+}
+```
+
+### Quota Management
+
+Track and predict Gmail API quota usage:
+
+```typescript
+// packages/core/src/quota/quota-tracker.ts
+export class QuotaTracker {
+  private readonly QUOTA_LIMIT = 250; // units per second per user
+  
+  async trackOperation(userId: string, units: number) {
+    const key = `quota:${userId}:${Math.floor(Date.now() / 1000)}`;
+    const current = await redis.incrby(key, units);
+    await redis.expire(key, 60); // 1 minute TTL
+    
+    if (current > this.QUOTA_LIMIT * 0.8) {
+      // Alert when approaching limit
+      await this.alertHighUsage(userId, current);
+    }
+    
+    return current <= this.QUOTA_LIMIT;
+  }
+}
+```
+
+## Performance Optimization
+
+### Memory Management
+
+Prevents browser crashes with large email datasets:
+
+```typescript
+// packages/core/src/memory/memory-manager.ts
+export class MemoryManager {
+  private memoryPressureCallbacks: Set<() => void> = new Set();
+  
+  constructor() {
+    this.startMemoryMonitoring();
+  }
+  
+  private startMemoryMonitoring() {
+    setInterval(() => {
+      this.checkMemoryPressure();
+    }, 10000); // Check every 10 seconds
+    
+    // Listen for memory pressure events (Chrome 91+)
+    if ('memory' in performance && 'addEventListener' in performance.memory) {
+      (performance.memory as any).addEventListener('pressure', (event: any) => {
+        this.handleMemoryPressure(event.level);
+      });
+    }
+  }
+  
+  private async checkMemoryPressure() {
+    if (!('memory' in performance)) return;
+    
+    const memory = (performance as any).memory;
+    const usageRatio = memory.usedJSHeapSize / memory.jsHeapSizeLimit;
+    
+    if (usageRatio > 0.9) {
+      await this.handleMemoryPressure('critical');
+    } else if (usageRatio > 0.7) {
+      await this.handleMemoryPressure('moderate');
+    }
+  }
+  
+  private async handleMemoryPressure(level: 'moderate' | 'critical') {
+    this.memoryPressureCallbacks.forEach(callback => callback());
+    
+    if (level === 'critical') {
+      // Clear email bodies from memory
+      await db.email_bodies.clear();
+      // Clear search index
+      if (window.searchWorker) {
+        window.searchWorker.postMessage({ type: 'CLEAR_INDEX' });
+      }
+    }
+  }
+}
+```
+
+### IndexedDB Optimization
+
+Archive and compress old emails for performance:
+
+```typescript
+// packages/storage/src/performance/db-optimizer.ts
+export class DatabaseOptimizer {
+  private readonly ARCHIVE_THRESHOLD_DAYS = 90;
+  private readonly COMPRESSION_THRESHOLD_SIZE = 1024 * 1024; // 1MB
+  
+  async optimizeStorage(): Promise<OptimizationResult> {
+    const result = {
+      archivedCount: 0,
+      compressedCount: 0,
+      spaceSaved: 0
+    };
+    
+    // Archive old emails
+    const cutoffDate = Date.now() - (this.ARCHIVE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000);
+    
+    const oldEmails = await db.email_headers
+      .where('date')
+      .below(cutoffDate)
+      .toArray();
+    
+    for (const header of oldEmails) {
+      const body = await db.email_bodies.get(header.id);
+      if (body && body.bodyHtml.length > this.COMPRESSION_THRESHOLD_SIZE) {
+        const compressed = await this.compressEmailBody(body);
+        await db.archived_emails.add({
+          ...header,
+          bodyCompressed: compressed,
+          archivedAt: Date.now()
+        });
+        result.archivedCount++;
+      }
+    }
+    
+    return result;
+  }
+}
+```
+
+## Data Integrity
+
+### Sync Validation
+
+Ensure consistency between local and server data:
+
+```typescript
+// packages/core/src/integrity/data-validator.ts
+export class DataIntegrityValidator {
+  async validateDataIntegrity(): Promise<ValidationReport> {
+    const report: ValidationReport = {
+      timestamp: new Date(),
+      errors: [],
+      warnings: []
+    };
+    
+    // Compare local count with Gmail
+    const localCount = await db.email_headers.count();
+    const gmailCount = await this.getGmailMessageCount();
+    
+    if (Math.abs(localCount - gmailCount) > 10) {
+      report.errors.push({
+        type: 'EMAIL_COUNT_MISMATCH',
+        message: `Local: ${localCount}, Gmail: ${gmailCount}`,
+        severity: 'high',
+        action: 'RESYNC_REQUIRED'
+      });
+    }
+    
+    return report;
+  }
+}
+```
 
 ## Observability
 

@@ -137,14 +137,21 @@ interface SyncCheckpoint {
 ### Immediate (MVP - Single Device)
 1. PostgreSQL schema for metadata
 2. Gmail API integration with batching
-3. Modifier queue for offline actions
-4. Progressive sync with checkpoints
+3. **OAuth token refresh mechanism**
+4. **XSS protection with CSP headers**
+5. **Circuit breaker for API resilience**
+6. **Basic quota tracking**
+7. Modifier queue for offline actions
+8. Progressive sync with checkpoints
 
 ### Soon After Launch
-1. Gmail Push Notifications
-2. Server-proxy search
-3. Redis for snooze features
-4. Progressive sync optimization
+1. **Memory management system**
+2. **IndexedDB optimization**
+3. **Data integrity validation**
+4. Gmail Push Notifications
+5. Server-proxy search
+6. Redis for snooze features
+7. Progressive sync optimization
 
 ### Future Enhancements
 1. Multi-project sharding

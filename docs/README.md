@@ -32,13 +32,14 @@ All documentation is **immutable** - these files represent permanent architectur
 9. **[BUSINESS_OVERVIEW.md](./BUSINESS_OVERVIEW.md)** - Product requirements and feature specifications
 10. **[FEATURES.md](./FEATURES.md)** - Comprehensive feature documentation with all email functionality
 11. **[SECURITY.md](./SECURITY.md)** - Security architecture, encryption, and authentication
-12. **[API_DESIGN.md](./API_DESIGN.md)** - Hybrid API design with metadata sync and search proxy
-13. **[PLATFORM_GUIDE.md](./PLATFORM_GUIDE.md)** - Platform-specific implementation details
-14. **[PERFORMANCE.md](./PERFORMANCE.md)** - Performance targets and optimization strategies
-15. **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Infrastructure setup and deployment procedures
-16. **[UI_DESIGN.md](./UI_DESIGN.md)** - Complete UI/UX design system and layout specifications
-17. **[KEYBOARD_SHORTCUTS.md](./KEYBOARD_SHORTCUTS.md)** - Comprehensive keyboard shortcut reference
-18. **[DATA_STRATEGY.md](./DATA_STRATEGY.md)** - Data durability, backup, and sync strategies
+12. **[SECURITY_PATTERNS.md](./SECURITY_PATTERNS.md)** - Critical security patterns (token refresh, XSS, rate limiting)
+13. **[API_DESIGN.md](./API_DESIGN.md)** - Hybrid API design with circuit breaker and resilience patterns
+14. **[PLATFORM_GUIDE.md](./PLATFORM_GUIDE.md)** - Platform-specific implementation details
+15. **[PERFORMANCE.md](./PERFORMANCE.md)** - Performance, memory management, and optimization strategies
+16. **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Infrastructure setup and deployment procedures
+17. **[UI_DESIGN.md](./UI_DESIGN.md)** - Complete UI/UX design system and layout specifications
+18. **[KEYBOARD_SHORTCUTS.md](./KEYBOARD_SHORTCUTS.md)** - Comprehensive keyboard shortcut reference
+19. **[DATA_STRATEGY.md](./DATA_STRATEGY.md)** - Data durability, backup, and sync strategies
 
 ## Quick Start
 
