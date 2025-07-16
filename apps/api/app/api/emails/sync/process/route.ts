@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Client } from 'pg';
 import { EmailSyncService } from '../../../../lib/email-sync';
 import { RulesEngineService } from '../../../../lib/rules-engine/service';
+import { PatternAnalysisWorker } from '../../../../lib/onboarding/pattern-analysis-worker';
 import { GmailClientEnhanced } from '@finito/provider-client';
 import { z } from 'zod';
 
@@ -51,11 +52,36 @@ export async function POST(request: NextRequest) {
       // Perform the sync
       const result = await emailSync.syncRecentEmails(userId);
       
-      // If sync was successful, process rules for newly synced emails
+      // If sync was successful, process rules for newly synced emails AND trigger pattern analysis
       let rulesProcessed = 0;
       let rulesErrors = 0;
+      let patternAnalysisTriggered = false;
       
       if (result.success && result.count > 0) {
+        // Check if this is the first sync for this user (trigger pattern analysis)
+        const syncHistoryResult = await dbClient.query(
+          'SELECT COUNT(*) as count FROM sync_jobs WHERE user_id = $1 AND status = $2',
+          [userId, 'completed']
+        );
+        
+        const isFirstSync = parseInt(syncHistoryResult.rows[0].count) === 0;
+        
+        if (isFirstSync) {
+          // Trigger pattern analysis for onboarding suggestions
+          try {
+            console.log(`🔍 Triggering pattern analysis for first-time user ${userId}`);
+            const analysisResult = await PatternAnalysisWorker.processUser(userId);
+            
+            if (analysisResult.success) {
+              console.log(`✅ Pattern analysis completed: ${analysisResult.suggestionsCreated} suggestions created`);
+              patternAnalysisTriggered = true;
+            } else {
+              console.error(`❌ Pattern analysis failed: ${analysisResult.error}`);
+            }
+          } catch (analysisError) {
+            console.error('Pattern analysis error:', analysisError);
+          }
+        }
         try {
           // Get Gmail client for rules processing
           const gmailClient = new GmailClientEnhanced();
@@ -135,7 +161,7 @@ export async function POST(request: NextRequest) {
           ['completed', result.count, JSON.stringify(result.timing), rulesProcessed, rulesErrors, jobId]
         );
 
-        console.log(`✅ Sync job ${jobId} completed successfully: ${result.count} emails, ${rulesProcessed} rules processed, ${rulesErrors} rules errors`);
+        console.log(`✅ Sync job ${jobId} completed successfully: ${result.count} emails, ${rulesProcessed} rules processed, ${rulesErrors} rules errors, pattern analysis: ${patternAnalysisTriggered}`);
         
         return NextResponse.json({ 
           success: true, 
@@ -143,7 +169,9 @@ export async function POST(request: NextRequest) {
           emailsSynced: result.count,
           timing: result.timing,
           rulesProcessed,
-          rulesErrors
+          rulesErrors,
+          patternAnalysisTriggered,
+          onboardingSuggestions: patternAnalysisTriggered ? 'Pattern analysis completed - check /api/onboarding/suggestions' : 'Not applicable'
         });
       } else {
         // Update job status to failed

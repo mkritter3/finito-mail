@@ -23,7 +23,7 @@ async function runSingleMigration() {
       )
     `);
 
-    const migrationFile = '007_async_actions_queue.sql';
+    const migrationFile = '008_onboarding_suggestions.sql';
     const filePath = path.join(__dirname, '../migrations', migrationFile);
     
     if (!fs.existsSync(filePath)) {
