@@ -1,6 +1,7 @@
 import { GmailClientEnhanced } from '@finito/provider-client';
 import { Client } from 'pg';
 import * as addrparser from 'address-rfc2822';
+import { dbPool } from './db-pool';
 
 // Types
 interface GmailMessage {
@@ -40,10 +41,8 @@ export class EmailSyncService {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     });
     
-    this.dbClient = new Client({
-      connectionString: process.env.DATABASE_URL!,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
+    // Use connection pool instead of individual client
+    this.dbClient = dbPool.getPool();
   }
 
   /**
@@ -56,9 +55,7 @@ export class EmailSyncService {
     let storeTime = 0;
     
     try {
-      await this.dbClient.connect();
-
-      // Get user's Google tokens
+      // Get user's Google tokens (using connection pool)
       const tokenResult = await this.dbClient.query(
         'SELECT access_token, refresh_token, expires_at FROM google_auth_tokens WHERE user_id = $1',
         [userId]
@@ -96,14 +93,37 @@ export class EmailSyncService {
       const messageIds = messagesResponse.messages.map(m => m.id);
       const messages: GmailMessage[] = [];
 
-      // Fetch messages individually (no batching for MVP)
-      for (const messageId of messageIds) {
+      // Fetch messages in batches for better performance
+      const batchSize = 10; // Gmail API allows up to 100 requests per batch
+      const batches = [];
+      
+      for (let i = 0; i < messageIds.length; i += batchSize) {
+        const batch = messageIds.slice(i, i + batchSize);
+        batches.push(batch);
+      }
+
+      console.log(`Fetching ${messageIds.length} messages in ${batches.length} batches`);
+
+      for (const batch of batches) {
         try {
-          const message = await this.gmailClient.getMessage(client, messageId, 'metadata');
-          messages.push(message as GmailMessage);
+          const batchPromises = batch.map(messageId => 
+            this.gmailClient.getMessage(client, messageId, 'metadata')
+              .catch(error => {
+                console.error(`Failed to fetch message ${messageId}:`, error);
+                return null;
+              })
+          );
+
+          const batchResults = await Promise.allSettled(batchPromises);
+          
+          for (const result of batchResults) {
+            if (result.status === 'fulfilled' && result.value) {
+              messages.push(result.value as GmailMessage);
+            }
+          }
         } catch (error) {
-          console.error(`Failed to fetch message ${messageId}:`, error);
-          // Continue with other messages
+          console.error(`Batch processing error:`, error);
+          // Continue with next batch
         }
       }
       
@@ -127,9 +147,8 @@ export class EmailSyncService {
     } catch (error) {
       console.error('Email sync error:', error);
       return { success: false, count: 0, error: error instanceof Error ? error.message : 'Unknown error' };
-    } finally {
-      await this.dbClient.end();
     }
+    // Note: Connection pool handles connections automatically, no need to end()
   }
 
   /**
@@ -193,42 +212,97 @@ export class EmailSyncService {
   }
 
   /**
-   * Store email metadata in PostgreSQL with idempotent upsert
+   * Store email metadata in PostgreSQL with batch upserts for better performance
    */
   private async storeEmailMetadata(emailMetadata: EmailMetadata[]): Promise<void> {
     if (emailMetadata.length === 0) return;
 
-    const query = `
-      INSERT INTO email_metadata (
-        user_id, gmail_message_id, gmail_thread_id, subject, snippet,
-        from_address, to_addresses, received_at, is_read, raw_gmail_metadata
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      ON CONFLICT (user_id, gmail_message_id)
-      DO UPDATE SET
-        is_read = EXCLUDED.is_read,
-        raw_gmail_metadata = EXCLUDED.raw_gmail_metadata,
-        updated_at = NOW()
-    `;
+    // Use batch insert for better performance
+    const batchSize = 50; // Process 50 emails at a time
+    const batches = [];
+    
+    for (let i = 0; i < emailMetadata.length; i += batchSize) {
+      const batch = emailMetadata.slice(i, i + batchSize);
+      batches.push(batch);
+    }
 
-    // Insert each email individually for MVP simplicity
-    for (const email of emailMetadata) {
+    console.log(`Storing ${emailMetadata.length} emails in ${batches.length} batches`);
+
+    for (const batch of batches) {
       try {
-        await this.dbClient.query(query, [
-          email.user_id,
-          email.gmail_message_id,
-          email.gmail_thread_id,
-          email.subject,
-          email.snippet,
-          JSON.stringify(email.from_address),
-          JSON.stringify(email.to_addresses),
-          email.received_at,
-          email.is_read,
-          JSON.stringify(email.raw_gmail_metadata),
-        ]);
+        // Build values array for batch insert
+        const values = [];
+        const placeholders = [];
+        
+        for (let i = 0; i < batch.length; i++) {
+          const email = batch[i];
+          const offset = i * 10;
+          
+          values.push(
+            email.user_id,
+            email.gmail_message_id,
+            email.gmail_thread_id,
+            email.subject,
+            email.snippet,
+            JSON.stringify(email.from_address),
+            JSON.stringify(email.to_addresses),
+            email.received_at,
+            email.is_read,
+            JSON.stringify(email.raw_gmail_metadata)
+          );
+          
+          placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10})`);
+        }
+
+        const query = `
+          INSERT INTO email_metadata (
+            user_id, gmail_message_id, gmail_thread_id, subject, snippet,
+            from_address, to_addresses, received_at, is_read, raw_gmail_metadata
+          )
+          VALUES ${placeholders.join(', ')}
+          ON CONFLICT (user_id, gmail_message_id)
+          DO UPDATE SET
+            is_read = EXCLUDED.is_read,
+            raw_gmail_metadata = EXCLUDED.raw_gmail_metadata,
+            updated_at = NOW()
+        `;
+
+        await this.dbClient.query(query, values);
       } catch (error) {
-        console.error(`Failed to store email ${email.gmail_message_id}:`, error);
-        // Continue with other emails
+        console.error(`Failed to store email batch:`, error);
+        
+        // Fallback to individual inserts for this batch
+        for (const email of batch) {
+          try {
+            const fallbackQuery = `
+              INSERT INTO email_metadata (
+                user_id, gmail_message_id, gmail_thread_id, subject, snippet,
+                from_address, to_addresses, received_at, is_read, raw_gmail_metadata
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+              ON CONFLICT (user_id, gmail_message_id)
+              DO UPDATE SET
+                is_read = EXCLUDED.is_read,
+                raw_gmail_metadata = EXCLUDED.raw_gmail_metadata,
+                updated_at = NOW()
+            `;
+
+            await this.dbClient.query(fallbackQuery, [
+              email.user_id,
+              email.gmail_message_id,
+              email.gmail_thread_id,
+              email.subject,
+              email.snippet,
+              JSON.stringify(email.from_address),
+              JSON.stringify(email.to_addresses),
+              email.received_at,
+              email.is_read,
+              JSON.stringify(email.raw_gmail_metadata),
+            ]);
+          } catch (individualError) {
+            console.error(`Failed to store individual email ${email.gmail_message_id}:`, individualError);
+          }
+        }
       }
     }
   }

@@ -1,6 +1,8 @@
 'use client'
 
 import { cn } from '@finito/ui'
+import { useEmailPrefetch } from '@/hooks/use-email-prefetch'
+import { useEmailStore } from '@/stores/email-store'
 
 interface EmailMetadata {
   id: string
@@ -41,6 +43,17 @@ export function EmailRow({ email }: EmailRowProps) {
   const fromAddress = email.from_address
   const displayName = fromAddress?.name || fromAddress?.email || 'Unknown'
   const avatar = fromAddress?.name?.[0] || fromAddress?.email?.[0] || 'U'
+  const { prefetchEmail } = useEmailPrefetch()
+  const setSelectedEmailId = useEmailStore((state) => state.setSelectedEmailId)
+
+  const handleMouseEnter = () => {
+    // Prefetch email content on hover for instant loading
+    prefetchEmail(email.gmail_message_id)
+  }
+
+  const handleClick = () => {
+    setSelectedEmailId(email.gmail_message_id)
+  }
 
   return (
     <div
@@ -49,10 +62,8 @@ export function EmailRow({ email }: EmailRowProps) {
         'email-row flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-border hover:bg-accent/50',
         !email.is_read && 'font-semibold'
       )}
-      onClick={() => {
-        // TODO: Implement email selection
-        console.log('Selected email:', email.id)
-      }}
+      onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
     >
       {/* Avatar */}
       <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium">

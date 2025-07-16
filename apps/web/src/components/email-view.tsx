@@ -1,6 +1,6 @@
 'use client'
 
-import { useEmail } from '@finito/storage'
+import { useFullEmail } from '@/hooks/use-full-email'
 import { formatDistanceToNow } from '@/lib/date'
 import { Reply, ReplyAll, Forward, Archive, Trash2, Star } from 'lucide-react'
 
@@ -9,7 +9,7 @@ interface EmailViewProps {
 }
 
 export function EmailView({ emailId }: EmailViewProps) {
-  const email = useEmail(emailId)
+  const { email, loading, error } = useFullEmail(emailId)
 
   const handleReply = () => {
     window.dispatchEvent(new CustomEvent('compose-email', { 
@@ -38,10 +38,26 @@ export function EmailView({ emailId }: EmailViewProps) {
     }))
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full text-red-500">
+        Error: {error}
+      </div>
+    )
+  }
+
   if (!email) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
-        Loading...
+        Email not found
       </div>
     )
   }
@@ -54,30 +70,30 @@ export function EmailView({ emailId }: EmailViewProps) {
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-              {email.from.name?.[0] || email.from.email[0].toUpperCase()}
+              {email.from[0].toUpperCase()}
             </div>
             <div>
               <div className="font-medium text-foreground">
-                {email.from.name || email.from.email}
+                {email.from}
               </div>
-              <div className="text-xs">{email.from.email}</div>
+              <div className="text-xs">to: {email.to}</div>
             </div>
           </div>
           <div className="ml-auto">
-            {formatDistanceToNow(email.timestamp)}
+            {formatDistanceToNow(new Date(email.date))}
           </div>
         </div>
       </div>
 
       {/* Email body */}
       <div className="flex-1 overflow-auto px-6 py-4">
-        {email.body.html ? (
+        {email.htmlBody ? (
           <div 
             className="prose prose-sm dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: email.body.html }}
+            dangerouslySetInnerHTML={{ __html: email.htmlBody }}
           />
         ) : (
-          <div className="whitespace-pre-wrap">{email.body.text}</div>
+          <div className="whitespace-pre-wrap">{email.textBody}</div>
         )}
       </div>
 
@@ -113,7 +129,7 @@ export function EmailView({ emailId }: EmailViewProps) {
             <Trash2 className="w-4 h-4" />
           </button>
           <button className="p-1.5 hover:bg-muted rounded-md transition-colors">
-            <Star className={`w-4 h-4 ${email.isStarred ? 'fill-current text-yellow-500' : ''}`} />
+            <Star className="w-4 h-4" />
           </button>
         </div>
       </div>
