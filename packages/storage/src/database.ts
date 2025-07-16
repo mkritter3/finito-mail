@@ -123,6 +123,98 @@ export class FinitoDatabase extends Dexie {
         createdAt
       `
     });
+
+    // Version 2: Add hybrid storage tables
+    this.version(2).stores({
+      // Previous tables (automatically maintained)
+      emails: `
+        id,
+        threadId,
+        timestamp,
+        [from.email+timestamp],
+        [threadId+timestamp],
+        [isRead+timestamp],
+        [folder+timestamp],
+        [isStarred+timestamp],
+        providerId
+      `,
+      
+      threads: `
+        id,
+        lastActivity,
+        [unreadCount+lastActivity]
+      `,
+      
+      attachments: `
+        id,
+        emailId,
+        [emailId+filename]
+      `,
+      
+      todos: `
+        id,
+        createdAt,
+        [completed+createdAt],
+        [priority+createdAt],
+        emailId,
+        threadId
+      `,
+      
+      todoEmailLinks: `
+        [todoId+emailId],
+        todoId,
+        emailId
+      `,
+      
+      searchIndex: `
+        id,
+        emailId,
+        timestamp
+      `,
+      
+      syncMetadata: `
+        id,
+        accountId,
+        lastSyncTime
+      `,
+      
+      accounts: `
+        id,
+        email,
+        provider,
+        isActive
+      `,
+      
+      apiKeys: `
+        provider,
+        createdAt
+      `,
+
+      // New hybrid storage tables
+      emailBodies: `
+        id,
+        cached_at
+      `,
+      
+      outbox: `
+        id,
+        status,
+        created_at,
+        [user_id+status],
+        [status+created_at]
+      `,
+      
+      emailMetadata: `
+        id,
+        thread_id,
+        date,
+        is_read,
+        is_starred,
+        [thread_id+date],
+        [is_read+date],
+        [is_starred+date]
+      `
+    });
   }
 
   // Helper methods for sync metadata

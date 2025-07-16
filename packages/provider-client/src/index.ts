@@ -1,4 +1,6 @@
 export * from './gmail/gmail-client';
+export * from './gmail/gmail-client-enhanced';
+export * from './gmail/retry';
 export * from './outlook/outlook-client';
 export * from './auth/pkce';
 export * from './auth/token-manager';
@@ -6,3 +8,7 @@ export * from './auth/worker-singleton';
 export * from './gemini/gemini-client';
 export * from './sync/email-sync';
 export * from './sync/progressive-sync';
+export * from './sync/server-sync';
+export * from './sync/queue-manager';
+export * from './utils/error';
+export * from './utils/logger';

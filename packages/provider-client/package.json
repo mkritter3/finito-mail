@@ -11,7 +11,11 @@
   },
   "dependencies": {
     "@finito/types": "*",
-    "@finito/crypto": "*"
+    "@finito/crypto": "*",
+    "@googleapis/gmail": "^7.0.0",
+    "@googleapis/people": "^5.0.0",
+    "p-retry": "^6.2.0",
+    "p-queue": "^8.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

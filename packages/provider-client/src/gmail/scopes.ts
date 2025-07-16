@@ -12,9 +12,8 @@ export const GMAIL_SCOPES = [
   // Gmail settings for filters, labels, etc.
   'https://www.googleapis.com/auth/gmail.settings.basic',
   
-  // Compose and send emails
-  'https://www.googleapis.com/auth/gmail.compose',
-  'https://www.googleapis.com/auth/gmail.send',
+  // Optional: Contacts access (can be enabled per environment)
+  // 'https://www.googleapis.com/auth/contacts',
 ];
 
 export const GMAIL_SCOPES_STRING = GMAIL_SCOPES.join(' ');
