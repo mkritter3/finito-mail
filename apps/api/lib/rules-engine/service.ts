@@ -3,6 +3,7 @@ import { gmail_v1 } from 'googleapis'
 import { dbPool } from '../db-pool'
 import { RuleEvaluator } from './evaluator'
 import { RuleExecutor } from './executor'
+import { HybridRuleExecutor, HybridExecutionResult } from './hybrid-executor'
 import { 
   EmailRule, 
   RuleExecution, 
@@ -32,10 +33,12 @@ import {
 export class RulesEngineService {
   private gmailClient: GmailClientEnhanced
   private executor: RuleExecutor
+  private hybridExecutor: HybridRuleExecutor
 
   constructor(gmailClient: GmailClientEnhanced) {
     this.gmailClient = gmailClient
     this.executor = new RuleExecutor(gmailClient)
+    this.hybridExecutor = new HybridRuleExecutor(gmailClient)
   }
 
   /**
@@ -50,7 +53,7 @@ export class RulesEngineService {
     
     try {
       // Security: Check execution rate limits
-      const recentExecutions = await this.getRecentExecutions(userId, 60000) // 1 minute
+      const recentExecutions = await this.getRecentExecutionsInternal(userId, 60000) // 1 minute
       const rateValidation = validateExecutionRate(recentExecutions, 60000)
       if (!rateValidation.success) {
         throw new Error('Rate limit exceeded: Too many rule executions')
@@ -110,17 +113,17 @@ export class RulesEngineService {
             }
           }
 
-          // Execute rule actions
-          const result = await this.executor.executeActions(rule.actions, context)
+          // Execute rule actions with hybrid sync/async approach
+          const result = await this.hybridExecutor.executeActionsHybrid(rule.actions, context, rule.id)
           
-          // Log execution
-          await this.logRuleExecution(rule.id, userId, email.gmail_message_id, result)
+          // Log execution with hybrid results
+          await this.logHybridRuleExecution(rule.id, userId, email.gmail_message_id, result)
           
           // Update rule statistics
           await this.updateRuleStats(rule.id)
           
           rulesExecuted++
-          actionsExecuted += result.actionsExecuted.length
+          actionsExecuted += result.syncActionsExecuted.length + result.asyncActionsQueued.length
           
           // Check if we should stop processing
           if (result.stopProcessing) {
@@ -514,6 +517,37 @@ export class RulesEngineService {
   }
 
   /**
+   * Log hybrid rule execution with both sync and async actions
+   */
+  private async logHybridRuleExecution(
+    ruleId: string,
+    userId: string,
+    emailMessageId: string,
+    result: HybridExecutionResult
+  ): Promise<void> {
+    const query = `
+      INSERT INTO rule_executions (
+        rule_id, user_id, email_message_id, success, error_message, 
+        actions_taken, execution_time_ms, sync_actions_executed, async_actions_queued
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `
+
+    const values = [
+      ruleId,
+      userId,
+      emailMessageId,
+      result.success,
+      result.errorMessage || null,
+      JSON.stringify([...result.syncActionsExecuted, ...result.asyncActionsQueued]),
+      result.executionTimeMs,
+      JSON.stringify(result.syncActionsExecuted),
+      JSON.stringify(result.asyncActionsQueued)
+    ]
+
+    await dbPool.query(query, values)
+  }
+
+  /**
    * Update rule statistics
    */
   private async updateRuleStats(ruleId: string): Promise<void> {
@@ -527,13 +561,27 @@ export class RulesEngineService {
   }
 
   /**
-   * Get recent executions for rate limiting
+   * Get recent executions for rate limiting (private method)
    */
-  private async getRecentExecutions(userId: string, timeWindowMs: number): Promise<RuleExecution[]> {
+  private async getRecentExecutionsInternal(userId: string, timeWindowMs: number): Promise<RuleExecution[]> {
     const query = `
       SELECT * FROM rule_executions 
-      WHERE user_id = $1 AND created_at > NOW() - INTERVAL '${timeWindowMs / 1000} seconds'
-      ORDER BY created_at DESC
+      WHERE user_id = $1 AND executed_at > NOW() - INTERVAL '${timeWindowMs / 1000} seconds'
+      ORDER BY executed_at DESC
+    `
+
+    const result = await dbPool.query(query, [userId])
+    return result.rows.map(row => this.mapExecutionFromDb(row))
+  }
+
+  /**
+   * Get recent executions for API endpoints
+   */
+  async getRecentExecutions(userId: string, timeWindowMs: number): Promise<RuleExecution[]> {
+    const query = `
+      SELECT * FROM rule_executions 
+      WHERE user_id = $1 AND executed_at > NOW() - INTERVAL '${timeWindowMs / 1000} seconds'
+      ORDER BY executed_at DESC
     `
 
     const result = await dbPool.query(query, [userId])
@@ -617,8 +665,8 @@ export class RulesEngineService {
       error_message: row.error_message,
       actions_taken: JSON.parse(row.actions_taken || '[]'),
       execution_time_ms: row.execution_time_ms,
-      triggered_by: row.triggered_by,
-      created_at: new Date(row.created_at)
+      triggered_by: row.triggered_by || 'email_sync',
+      created_at: new Date(row.executed_at) // Use executed_at from existing table
     }
   }
 
