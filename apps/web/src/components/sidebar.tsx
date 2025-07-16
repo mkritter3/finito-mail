@@ -21,6 +21,7 @@ const folders = [
 
 const specialItems = [
   { id: 'onboarding', label: 'Instant Triage', icon: '✨', href: '/onboarding' },
+  { id: 'rules', label: 'Rules', icon: '⚙️', href: '/rules' },
 ]
 
 export function Sidebar({ isOpen, onToggle }: SidebarProps) {
