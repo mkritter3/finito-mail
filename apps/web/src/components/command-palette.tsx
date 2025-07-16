@@ -5,7 +5,7 @@ interface CommandPaletteProps {
   onClose: () => void
 }
 
-export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose: _ }: CommandPaletteProps) {
   if (!isOpen) return null
 
   return (

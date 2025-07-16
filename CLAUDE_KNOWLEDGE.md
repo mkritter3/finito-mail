@@ -195,6 +195,132 @@ claude "Use zen chat with gemini-2.5-pro to analyze [requirements] and suggest a
 - **Error Detection**: E2E testing catches issues before production
 - **Development Speed**: Hot reload + container isolation = optimal workflow
 
+## 📧 Finito Mail Project Knowledge (NEW)
+
+### Project Overview (LEARNED)
+- **Type**: Client-first email client inspired by Superhuman
+- **Architecture**: 99% operations in browser, emails never touch servers
+- **Storage**: IndexedDB (50GB+) for all email data
+- **Performance Target**: <50ms for all interactions
+- **Business Model**: $9.99/month with 99% gross margins ($0.035/user infrastructure)
+
+### Key Architectural Insights (FROM GEMINI COLLABORATION)
+1. **Initial Sync Challenge**: Most critical engineering challenge - downloading user's entire mailbox
+   - Must handle API rate limits with exponential backoff
+   - Progressive sync: Recent 30 days first, then background historical
+   - Use Web Workers to prevent UI blocking
+   
+2. **Security Architecture**: 
+   - OAuth tokens stored in IndexedDB accessed only via Web Worker
+   - PKCE flow for secure client-side auth
+   - XSS mitigation through token isolation
+   
+3. **Cross-Device Sync**:
+   - Provider handles basic state (read/unread, labels)
+   - Minimal metadata service for Finito features (todos, snoozes)
+   - Device registry for push notifications
+
+### Implementation Priority (STRATEGIC GUIDANCE)
+1. **Vertical Slice Approach**: Auth → 30-Day Sync → Display → Basic Actions
+2. **Start with Schema**: Define Dexie.js schema first (@finito/storage)
+3. **Then Provider Client**: Build Gmail/Outlook abstraction (@finito/provider-client)
+4. **Finally Sync Worker**: Web Worker orchestrating the data pipeline
+
+### Tech Stack Details (VERIFIED)
+- **Frontend**: Next.js 14, React 18, Tailwind CSS, Zustand
+- **Storage**: Dexie.js (IndexedDB wrapper)
+- **Search**: MiniSearch.js in Web Worker
+- **AI**: Gemini Flash (user provides API key)
+- **Monorepo**: Turborepo with pnpm
+
+### Current Project State (AS OF 2025-01-15)
+- Phase 0: Documentation & Setup
+- Basic UI components exist with mock data
+- No IndexedDB implementation yet
+- No provider API clients yet
+- Empty package structure ready for implementation
+
 ---
 
-**Last Knowledge Update**: 2025-01-10 - Implemented self-learning documentation architecture with verified command status and workflow patterns.
+### VS Code Remote Container Port Forwarding (LEARNED)
+- **Issue**: Next.js dev server not accessible from host when running in VS Code Remote Container
+- **Solution**: 
+  1. Update package.json to bind to 0.0.0.0: `"dev": "next dev -H ${NEXT_HOST:-0.0.0.0} -p ${PORT:-3000}"`
+  2. Create `.devcontainer/devcontainer.json` with explicit `"forwardPorts": [3000]`
+  3. Check VS Code PORTS tab for manual forwarding if needed
+- **Best Practice**: Always use explicit devcontainer.json for consistent team development
+
+### Web Worker in Next.js 14 Monorepo (LEARNED)
+- **Issue**: Worker initialization returning null intermittently in React StrictMode
+- **Root Cause**: Worker lifecycle tied to React component lifecycle causes race conditions
+- **Solution**: Singleton pattern decoupling worker from React components
+  1. Create `worker-singleton.ts` managing single worker instance
+  2. Worker initialized once at app level, not component level
+  3. Components only attach/detach listeners, never terminate worker
+  4. Use inline `new Worker(new URL('./worker.ts', import.meta.url))` for webpack
+- **Key Constraints**:
+  - Webpack 5 requires inline URL construction for static analysis
+  - Next.js has known path resolution issues with `new URL`
+  - React StrictMode double-renders can cause duplicate initialization
+- **Best Practice**: Always treat workers as app-level singletons, not component resources
+
+### Three-Tier State Architecture (DOCUMENTED)
+- **Tier 1: Provider State** - Gmail/Outlook as source of truth for emails
+- **Tier 2: Finito Metadata** - Minimal service for custom features only
+- **Tier 3: Local Cache** - IndexedDB as performance layer
+- **Key Insight**: Gmail acts as distributed database, no need for server storage
+
+### Inbox Zero Integration Insights (LEARNED)
+- **OAuth Implementation**: They use NextAuth with proper token refresh
+- **Batch API Optimization**: Max 20 messages per batch to avoid rate limits
+- **Error Handling**: Retry logic with exponential backoff for 429 errors
+- **Progressive Sync Pattern**: Adapted their server-side sync for client-side
+- **Scope Configuration**: Use gmail.modify instead of readonly for full functionality
+- **Token Storage**: They encrypt tokens server-side, we use Web Workers client-side
+- **Best Practices**:
+  - Separate scopes configuration file
+  - Batch API for efficient message fetching
+  - Proper base64url decoding for email bodies
+  - Rate limiting with delays between pages
+
+### Key Files Adapted from Inbox Zero
+- `/packages/provider-client/src/gmail/scopes.ts` - Gmail API scopes
+- `/packages/provider-client/src/gmail/api-utils.ts` - Batch API utilities
+- `/packages/provider-client/src/sync/progressive-sync.ts` - Two-phase sync
+
+### Inbox Zero vs Finito Mail Cost Analysis (LEARNED)
+**Inbox Zero Infrastructure (Metadata-Only Storage)**:
+- PostgreSQL database for email metadata only (50MB/user)
+- Email bodies fetched on-demand from Gmail
+- Estimated cost: $0.07-0.30/user/month
+- Server-side search on metadata
+
+**Finito Mail Infrastructure (Hybrid with Redis)**:
+- Redis for minimal metadata (<1MB/user)
+- Email headers in IndexedDB, bodies on-demand
+- Client-first search with server proxy fallback
+- Total cost: $0.035-0.10/user/month
+- Both architectures avoid $4-6/user of full email storage!
+
+**Critical Implementation Decisions (FROM GEMINI ANALYSIS)**:
+1. **Metadata Storage**: Stick with Redis, abstract data layer for future PostgreSQL migration
+2. **Search**: "Client-Cache + Server-Proxy" pattern - client searches locally, server proxies to Gmail API
+3. **Sending**: Use standard messages.send (100 units) - SES pattern only works for custom domains
+4. **Sharding**: Architect for it, but implement only at 50-60% quota usage
+
+**Key Optimizations Needed**:
+1. **Offline Sync**: Client-side command queue + Gmail Push Notifications
+2. **Batch API**: Use Gmail batch endpoint to reduce HTTP round-trips
+3. **Redis Sorted Sets**: For time-based queries (e.g., snooze wake-ups)
+   ```
+   ZADD snoozed_messages <timestamp> "userId::messageId"
+   ZRANGEBYSCORE snoozed_messages 0 <now>
+   ```
+
+**Gmail API Quota Reality**:
+- Cannot send from @gmail.com via SES (domain verification required)
+- messages.insert likely 25-50 units (not confirmed)
+- Batch requests save round-trips but not quota units
+- Push notifications essential for efficient sync
+
+**Last Knowledge Update**: 2025-01-16 - Corrected architecture understanding and added implementation optimizations.

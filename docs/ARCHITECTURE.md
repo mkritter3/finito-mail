@@ -1,5 +1,8 @@
 # System Architecture
 
+**Purpose**: Detailed technical implementation guide - the "how". Contains schemas, data flows, component interactions, and implementation details.  
+**For high-level overview**: See [ARCHITECTURE_SUMMARY.md](./ARCHITECTURE_SUMMARY.md) for the "what" and "why".
+
 ## Overview
 
 This document defines the immutable system architecture for Finito Mail. It serves as the authoritative reference for all architectural decisions and system design.
@@ -181,6 +184,73 @@ finito-mail/
 
 ## Data Flow Architecture
 
+### Three-Tier State Architecture
+
+Our architecture uses a three-tier state model that elegantly solves cross-device sync while maintaining performance:
+
+#### Tier 1: Provider State (Gmail/Outlook)
+- **Purpose**: Source of truth for all email content and standard state
+- **Contains**: Emails, read/unread status, labels, folders, archives
+- **Sync**: Handled automatically by the provider across all devices
+- **Access**: Direct API calls via OAuth2 PKCE
+
+#### Tier 2: Finito Metadata Service
+- **Purpose**: Source of truth for Finito-specific features only
+- **Contains**: Custom tags, todos, snooze times, reading positions
+- **Storage**: Minimal key-value store (Upstash Redis)
+- **Example**: `{userId, gmailMessageId} → {snoozeUntil: "2024-08-01", todo: "completed"}`
+
+#### Tier 3: Local Cache (IndexedDB)
+- **Purpose**: Performance layer - disposable cache of Tiers 1 & 2
+- **Contains**: Replicated email data + Finito metadata for instant access
+- **Rebuild**: Can be completely reconstructed from Tiers 1 & 2
+- **Split Schema**: Headers for list view, bodies loaded on-demand
+
+### Progressive Sync Strategy
+
+To ensure emails load instantly and never hinder performance:
+
+#### Initial Device Setup
+```
+1. Authenticate → Get OAuth tokens
+2. Fetch first 50 messages from Inbox + Sent → Display immediately
+3. Fetch Finito metadata for visible emails → Merge with headers
+4. Store sync state (historyId/deltaToken) for incremental updates
+5. Background: Progressively sync older emails (90 days, 1 year, all)
+6. Background: Download email bodies for recent emails
+7. Background: Build search indices as data arrives
+```
+
+#### Sync Prioritization
+```
+Priority 1 (Instant): 
+- First 50 messages from current folder (default: Inbox)
+- First 50 messages from Sent folder
+- Finito metadata for visible emails
+- Store sync tokens for incremental updates
+
+Priority 2 (Background - Fast):
+- Email bodies for last 7 days
+- Headers for last 90 days
+- Frequently accessed labels
+
+Priority 3 (Background - Slow):
+- Email bodies for last 30 days
+- Headers for last year
+- Search index building
+
+Priority 4 (Background - Idle):
+- All historical emails
+- Attachment metadata
+- Full archive
+```
+
+#### Performance Guarantees
+- **First paint**: <1 second (show UI with loading state)
+- **First emails visible**: <3 seconds (most recent headers)
+- **Fully interactive**: <5 seconds (can read, search, compose)
+- **Background sync**: Never blocks UI, uses requestIdleCallback
+
 ### Client-First Email Sync
 ```
 1. Client → Direct Gmail/Outlook API call
@@ -189,6 +259,55 @@ finito-mail/
 4. Push notification → Active clients
 5. Client pulls changes → Direct API
 6. No server storage of email content!
+```
+
+### Optimistic UI Pattern
+
+All user actions update immediately with background sync:
+
+```
+1. User Action (e.g., archive email)
+2. Immediate UI Update (remove from inbox view)
+3. Update local IndexedDB state
+4. Queue background API call to provider
+5. If API succeeds → State confirmed
+6. If API fails → Must handle failure:
+   a. Revert IndexedDB state
+   b. Restore UI (add email back)
+   c. Show non-intrusive error toast
+   d. Log error for debugging
+```
+
+**Critical**: Every optimistic action MUST have a corresponding failure handler. This ensures <50ms response times while maintaining data integrity.
+
+### Error Recovery Patterns
+
+```typescript
+// Example: Robust archive operation
+async function archiveEmail(messageId: string) {
+  // 1. Optimistic UI update
+  removeFromInboxView(messageId);
+  
+  // 2. Store rollback state
+  const rollbackState = await getEmailState(messageId);
+  
+  // 3. Update local DB
+  await db.email_headers.update(messageId, {
+    labels: labels.filter(l => l !== 'INBOX')
+  });
+  
+  try {
+    // 4. Background API call
+    await gmailClient.modifyLabels(messageId, 
+      { remove: ['INBOX'] }
+    );
+  } catch (error) {
+    // 5. Rollback everything
+    await db.email_headers.update(messageId, rollbackState);
+    addToInboxView(messageId);
+    showToast('Failed to archive email', { type: 'error' });
+  }
+}
 ```
 
 ### Authentication Flow (PKCE)
@@ -253,6 +372,69 @@ MiniSearch Query → Results
 - Search indices
 - Thread relationships
 - Encrypted with WebCrypto
+
+##### Split Schema Design
+To optimize performance with large datasets:
+
+```typescript
+// Headers table - for list views (small, fast)
+// Indexes: ['date', 'threadId', 'labels', '[isRead, date]']
+email_headers: {
+  id: string;              // Provider's message ID (Primary Key)
+  threadId: string;
+  from: { name?: string; email: string };
+  to: { name?: string; email: string }[];
+  subject: string;
+  snippet: string;         // First 100 chars
+  date: number;            // Unix timestamp for efficient sorting
+  isRead: 0 | 1;          // 0/1 for better index performance
+  labels: string[];        // Indexed with multiEntry: true
+  hasAttachment: boolean;
+}
+
+// Bodies table - loaded on demand (large, lazy)
+email_bodies: {
+  id: string;              // matches header.id (Primary Key)
+  bodyText: string;
+  bodyHtml: string;
+  attachments: {           // Metadata only, no blobs!
+    id: string;
+    filename: string;
+    size: number;
+    contentType: string;
+  }[];
+}
+
+// Finito-specific metadata (cached from Tier 2)
+finito_metadata: {
+  messageId: string;       // matches header.id (Primary Key)
+  snoozeUntil?: number;
+  todoId?: string;
+  customTags?: string[];
+  readingPosition?: number;
+  // ... other Finito features
+}
+
+// Attachment cache with LRU eviction
+attachment_cache: {
+  attachmentId: string;    // Provider's attachment ID (Primary Key)
+  messageId: string;       // For context
+  blob: Blob;             // Actual file content
+  lastAccessed: number;    // For LRU eviction
+  size: number;           // For quota management
+}
+
+// Sync state tracking
+sync_state: {
+  folderId: string;        // e.g., 'INBOX', 'SENT' (Primary Key)
+  historyId?: string;      // Gmail's history ID
+  deltaToken?: string;     // Outlook's delta token
+  lastSync: number;        // Unix timestamp
+  totalMessages: number;   // For progress tracking
+}
+
+// Enables instant list rendering while keeping memory low
+```
 
 ##### Thread Storage Schema
 ```typescript
@@ -330,6 +512,13 @@ interface ThreadStore {
 2. **No Database Limits**: Each user is their own database
 3. **No Infrastructure Scaling**: Browser does the work
 4. **No Cost Scaling**: $35/month for 1 user or 10,000
+
+### Why Gmail/Outlook as Your Database Works
+- **Gmail handles 1.8B users** - We're just another email client
+- **Provider manages sync** - Cross-device consistency solved
+- **Natural conflict resolution** - Provider state always wins
+- **No data duplication** - Single source of truth
+- **Generous rate limits** - Designed for client access
 
 ### Performance Characteristics
 ```
@@ -576,3 +765,272 @@ Total: $20/mo for 1000 users
 ---
 
 **Note**: This architecture is designed to start within free tier limits during early development and beta testing. As a commercial SaaS product, we'll progressively scale to paid tiers as our subscriber base grows, maintaining the same architectural principles while ensuring reliable service for paying customers.
+## Modifier Queue Pattern (Inspired by Superhuman)
+
+### Overview
+The Modifier Queue pattern enables instant UI updates with background synchronization, providing a responsive user experience even with API rate limits or offline conditions.
+
+### Architecture
+Every user action follows a two-phase pattern:
+
+```typescript
+interface Modifier<T> {
+  // Phase 1: Instant local update (synchronous)
+  modify(data: T): void;
+  
+  // Phase 2: Queued API persistence (asynchronous)
+  persist(): Promise<void>;
+}
+
+// Example: Archive Email Modifier
+class ArchiveEmailModifier implements Modifier<Email> {
+  constructor(
+    private emailId: string,
+    private userId: string
+  ) {}
+  
+  modify(email: Email) {
+    // Instant UI update - no network latency
+    email.labels = email.labels.filter(l => l \!== "INBOX");
+    email.archived = true;
+    
+    // Update IndexedDB immediately
+    db.email_headers.update(this.emailId, {
+      labels: email.labels,
+      archived: true
+    });
+  }
+  
+  async persist() {
+    // Queued for background sync with Gmail API
+    await gmailClient.modifyLabels(this.emailId, {
+      removeLabelIds: ["INBOX"]
+    });
+    
+    // Update sync metadata
+    await redis.hset(`user:${this.userId}:message:${this.emailId}`, {
+      archived: true,
+      archivedAt: new Date().toISOString()
+    });
+  }
+}
+```
+
+### Benefits
+
+1. **Instant Responsiveness**: UI updates happen immediately without waiting for network
+2. **Offline Capability**: Actions queue locally and sync when connection returns
+3. **Rate Limit Resilience**: Automatic retry with exponential backoff
+4. **Data Consistency**: Failed operations can be reverted with proper error handling
+5. **User Trust**: Users see their actions take effect immediately
+
+### Desktop vs Web Considerations
+
+For the desktop app, the modifier queue can leverage:
+- More aggressive local caching (3-6 months vs 30 days)
+- Background processing without browser limitations
+- Native file system for queue persistence
+- OS-level network state detection
+
+## Observability
+
+### Logging Strategy
+
+All services use structured JSON logging with consistent fields:
+
+```typescript
+interface LogEntry {
+  timestamp: string;      // ISO 8601
+  level: 'debug' | 'info' | 'warn' | 'error';
+  service: string;        // 'api' | 'sync' | 'webhook'
+  userId?: string;        // Always included when available
+  operationId: string;    // UUID for tracing requests
+  message: string;
+  metadata?: any;         // Additional context
+}
+
+// Example log entry
+{
+  "timestamp": "2024-01-15T10:30:45.123Z",
+  "level": "info",
+  "service": "sync",
+  "userId": "user123",
+  "operationId": "550e8400-e29b-41d4-a716-446655440000",
+  "message": "Sync completed",
+  "metadata": {
+    "emailsSynced": 1523,
+    "duration": 45623,
+    "provider": "gmail"
+  }
+}
+```
+
+### Key Performance Indicators (KPIs)
+
+Monitor these metrics for system health:
+
+1. **Modifier Queue Depth**: Alert if >1000 items for >10 minutes
+2. **API Proxy p95 Latency**: Target <500ms, alert if >2s
+3. **Gmail API Error Rate**: Alert if >5% errors in 5-minute window
+4. **Sync Job Failure Rate**: Alert if >10% failures in 1 hour
+5. **WebSocket Connection Count**: Track active real-time connections
+
+### Monitoring Stack
+
+```typescript
+// Metrics collection with Prometheus format
+export const metrics = {
+  modifierQueueDepth: new Gauge({
+    name: 'modifier_queue_depth',
+    help: 'Number of pending modifier operations'
+  }),
+  
+  apiLatency: new Histogram({
+    name: 'api_request_duration_seconds',
+    help: 'API request latency',
+    labelNames: ['method', 'endpoint', 'status']
+  }),
+  
+  syncJobsTotal: new Counter({
+    name: 'sync_jobs_total',
+    help: 'Total sync jobs processed',
+    labelNames: ['status', 'provider']
+  })
+};
+```
+
+### Alerting Rules
+
+| Alert | Condition | Severity | Action |
+|-------|-----------|----------|--------|
+| High Queue Depth | >1000 items for 10min | Warning | Check for API issues |
+| API Latency | p95 >2s for 5min | Critical | Scale API servers |
+| Gmail Rate Limit | >10% 429s | Warning | Reduce sync rate |
+| Sync Failures | >10% in 1hr | Critical | Check provider status |
+| Low Disk Space | <10% free | Critical | Clean old logs |
+
+## Client Database Migration
+
+### Schema Versioning with Dexie.js
+
+```typescript
+// packages/storage/src/database.ts
+import Dexie from 'dexie';
+
+class FinitoDatabase extends Dexie {
+  constructor() {
+    super('FinitoMail');
+    
+    // Version 1: Initial schema
+    this.version(1).stores({
+      email_headers: 'id, threadId, date, [isRead+date]',
+      email_bodies: 'id',
+      finito_metadata: 'messageId'
+    });
+    
+    // Version 2: Add snooze support
+    this.version(2).stores({
+      email_headers: 'id, threadId, date, [isRead+date], snoozeUntil',
+      email_bodies: 'id',
+      finito_metadata: 'messageId',
+      snoozed_emails: 'id, snoozeUntil' // New table
+    }).upgrade(tx => {
+      // Migrate existing snoozed emails
+      return tx.finito_metadata.toCollection()
+        .filter(m => m.snoozeUntil)
+        .each(m => {
+          tx.snoozed_emails.add({
+            id: m.messageId,
+            snoozeUntil: m.snoozeUntil
+          });
+        });
+    });
+  }
+}
+```
+
+### Migration Process
+
+1. **Version Increment**: Always increment DB version for schema changes
+2. **Non-Destructive**: Migrations must preserve existing data
+3. **Backward Compatible**: Handle users on older app versions
+4. **Testing**: Test migrations with production-size datasets
+
+### Migration Checklist
+
+When changing IndexedDB schema:
+- [ ] Increment version number in `db.version(X)`
+- [ ] Write upgrade function for version transition
+- [ ] Test with empty database (new user)
+- [ ] Test with existing data (upgrade path)
+- [ ] Test with large dataset (50k+ emails)
+- [ ] Document migration in changelog
+- [ ] Consider impact on active users
+
+## Error Recovery Strategies
+
+### Sync Failure Recovery
+
+```typescript
+class SyncRecovery {
+  async handleSyncFailure(error: Error, checkpoint: SyncCheckpoint) {
+    // 1. Log detailed error context
+    logger.error('Sync failed', {
+      error,
+      checkpoint,
+      userId: checkpoint.userId,
+      operationId: this.operationId
+    });
+    
+    // 2. Determine if retryable
+    if (this.isRetryable(error)) {
+      // Exponential backoff
+      const delay = Math.min(
+        1000 * Math.pow(2, checkpoint.failureCount),
+        300000 // Max 5 minutes
+      );
+      
+      await this.scheduleRetry(checkpoint, delay);
+    } else {
+      // Non-retryable, notify user
+      await this.notifyUser(checkpoint.userId, {
+        type: 'SYNC_FAILED',
+        error: error.message
+      });
+    }
+    
+    // 3. Update checkpoint with failure
+    await this.updateCheckpoint({
+      ...checkpoint,
+      failureCount: checkpoint.failureCount + 1,
+      lastFailure: new Date()
+    });
+  }
+}
+```
+
+### Client Reconnection
+
+```typescript
+class ConnectionManager {
+  private reconnectAttempts = 0;
+  private maxReconnectDelay = 30000; // 30 seconds
+  
+  async handleDisconnect() {
+    const delay = Math.min(
+      1000 * Math.pow(1.5, this.reconnectAttempts),
+      this.maxReconnectDelay
+    );
+    
+    this.reconnectAttempts++;
+    
+    setTimeout(() => {
+      this.connect().then(() => {
+        this.reconnectAttempts = 0;
+        this.syncPendingOperations();
+      });
+    }, delay);
+  }
+}
+```
+

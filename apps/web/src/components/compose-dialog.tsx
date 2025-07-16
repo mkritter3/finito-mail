@@ -4,8 +4,9 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Send, Paperclip, Image, Link, Smile, MoreVertical } from 'lucide-react'
 import { Button } from '@finito/ui'
-import { useEmailStore } from '@/stores/email-store'
+// import { useEmailStore } from '@/stores/email-store'
 import { useAuth } from '@/hooks/use-auth'
+import { gmailClient } from '@finito/provider-client'
 import type { EmailAddress } from '@finito/types'
 
 interface ComposeDialogProps {
@@ -28,7 +29,6 @@ export function ComposeDialog({
   replyTo,
   mode = 'compose' 
 }: ComposeDialogProps) {
-  const { gmailClient } = useEmailStore()
   const { getAccessToken } = useAuth()
   const [to, setTo] = useState('')
   const [cc, setCc] = useState('')

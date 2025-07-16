@@ -139,3 +139,6 @@ export class FinitoDatabase extends Dexie {
     });
   }
 }
+
+// Export singleton instance
+export const database = new FinitoDatabase();

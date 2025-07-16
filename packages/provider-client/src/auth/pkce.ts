@@ -19,7 +19,8 @@ export class PKCEService {
     const digest = await crypto.subtle.digest('SHA-256', data);
     
     // Convert to base64url
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
+    const bytes = new Uint8Array(digest);
+    const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
     const codeChallenge = base64
       .replace(/\+/g, '-')
       .replace(/\//g, '_')

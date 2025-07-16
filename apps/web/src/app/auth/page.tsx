@@ -1,34 +1,36 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@finito/ui'
-import { PKCEService } from '@finito/provider-client'
-import { useEmailStore } from '@/stores/email-store'
-
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
-const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
-const GOOGLE_SCOPES = [
-  'https://www.googleapis.com/auth/gmail.readonly',
-  'https://www.googleapis.com/auth/gmail.send',
-  'https://www.googleapis.com/auth/gmail.modify',
-  'https://www.googleapis.com/auth/gmail.compose',
-  'email',
-  'profile'
-].join(' ')
+import { gmailClient, getTokenManager, getWorkerState } from '@finito/provider-client'
 
 export default function AuthPage() {
   const router = useRouter()
-  const { setProvider } = useEmailStore()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [workerDebugInfo, setWorkerDebugInfo] = useState<string>('')
 
   useEffect(() => {
     // Check if already authenticated
     const checkAuth = async () => {
-      const token = localStorage.getItem('gmail_access_token')
-      if (token) {
-        router.push('/mail')
+      try {
+        // Get token manager singleton instance
+        const tokenManager = getTokenManager()
+        
+        // Check authentication status
+        const authStatus = await tokenManager.checkAuth('gmail')
+        if (authStatus.authenticated) {
+          router.push('/mail')
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error)
+        // Log worker state for debugging
+        const state = getWorkerState()
+        setWorkerDebugInfo(`Worker state: ${state}`)
+      } finally {
+        setIsCheckingAuth(false)
       }
     }
     checkAuth()
@@ -39,32 +41,33 @@ export default function AuthPage() {
       setIsLoading(true)
       setError(null)
 
-      // Initialize PKCE
-      const pkce = new PKCEService()
-      const { challenge, verifier } = await pkce.generateChallenge()
+      // Log worker state before starting auth flow
+      const workerState = getWorkerState()
+      console.log('[Auth Page] Worker state before auth:', workerState)
+      setWorkerDebugInfo(`Worker state: ${workerState}`)
 
-      // Store verifier for later use
-      sessionStorage.setItem('pkce_verifier', verifier)
-
-      // Build authorization URL
-      const params = new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID,
-        redirect_uri: `${window.location.origin}/auth/callback`,
-        response_type: 'code',
-        scope: GOOGLE_SCOPES,
-        code_challenge: challenge,
-        code_challenge_method: 'S256',
-        access_type: 'offline',
-        prompt: 'consent'
-      })
+      // Get authorization URL
+      const authUrl = await gmailClient.startAuthFlow()
 
       // Redirect to Google auth
-      window.location.href = `${GOOGLE_AUTH_URL}?${params.toString()}`
+      window.location.href = authUrl
     } catch (error) {
-      setError('Failed to initialize authentication')
+      console.error('Auth error:', error)
+      const workerState = getWorkerState()
+      setError(`Failed to initialize authentication. Worker state: ${workerState}`)
       setIsLoading(false)
     }
   }
+
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -81,20 +84,23 @@ export default function AuthPage() {
           {error && (
             <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4">
               <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
+              {workerDebugInfo && (
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{workerDebugInfo}</p>
+              )}
             </div>
           )}
           
           <div className="space-y-4">
             <Button
               onClick={handleGoogleAuth}
-              disabled={isLoading || !GOOGLE_CLIENT_ID}
+              disabled={isLoading || !clientId}
               className="w-full"
               size="lg"
             >
               {isLoading ? 'Connecting...' : 'Continue with Google'}
             </Button>
 
-            {!GOOGLE_CLIENT_ID && (
+            {!clientId && (
               <p className="text-sm text-center text-red-600">
                 Google Client ID not configured. Please set NEXT_PUBLIC_GOOGLE_CLIENT_ID environment variable.
               </p>

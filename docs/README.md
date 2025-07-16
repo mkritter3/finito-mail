@@ -5,15 +5,15 @@
 This is the single source of truth for the Finito Mail project - a blazing-fast, premium email client inspired by Superhuman, supporting web, desktop, and mobile platforms with true frontend/backend separation.
 
 ### Vision
-Build an email client that beats Superhuman's performance through revolutionary client-first architecture - delivering <50ms response times at $9.99/month with 99% gross margins.
+Build an email client that beats Superhuman's performance through hybrid architecture - delivering <50ms response times at $9.99/month with exceptional margins.
 
 ### Core Principles
-- **Client-First Architecture**: 99% of operations in the browser (no server costs)
-- **Performance First**: <50ms interactions (no network latency)
-- **True Privacy**: Emails never touch our servers
-- **Infinite Scalability**: Each user is their own database
-- **99% Gross Margins**: $0.035/user infrastructure cost
-- **Works Offline**: Full functionality without internet
+- **Hybrid Architecture**: Client-side performance with server-side sync (like Inbox Zero)
+- **Performance First**: <50ms interactions through local caching
+- **Cross-Device Sync**: Seamless experience across all devices
+- **Privacy by Design**: Email bodies never touch our servers
+- **Exceptional Margins**: $0.10-0.30/user infrastructure cost
+- **Works Offline**: Full functionality with background sync
 
 ## Documentation Structure
 
@@ -22,18 +22,23 @@ All documentation is **immutable** - these files represent permanent architectur
 ### Core Documentation
 
 1. **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System design, component relationships, and data flow
-2. **[TECH_STACK.md](./TECH_STACK.md)** - Technology choices with detailed rationale
-3. **[BUSINESS_OVERVIEW.md](./BUSINESS_OVERVIEW.md)** - Product requirements and feature specifications
-4. **[FEATURES.md](./FEATURES.md)** - Comprehensive feature documentation with all email functionality
-5. **[SECURITY.md](./SECURITY.md)** - Security architecture, encryption, and authentication
-6. **[API_DESIGN.md](./API_DESIGN.md)** - Minimal REST API contracts (auth & webhooks only)
-7. **[PLATFORM_GUIDE.md](./PLATFORM_GUIDE.md)** - Platform-specific implementation details
-8. **[PERFORMANCE.md](./PERFORMANCE.md)** - Performance targets and optimization strategies
-9. **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Infrastructure setup and deployment procedures
-10. **[ROADMAP.md](./ROADMAP.md)** - Detailed implementation phases with metrics
-11. **[UI_DESIGN.md](./UI_DESIGN.md)** - Complete UI/UX design system and layout specifications
-12. **[KEYBOARD_SHORTCUTS.md](./KEYBOARD_SHORTCUTS.md)** - Comprehensive keyboard shortcut reference
-13. **[DATA_STRATEGY.md](./DATA_STRATEGY.md)** - Data durability, backup, and sync strategies
+2. **[ARCHITECTURAL_DECISIONS.md](./ARCHITECTURAL_DECISIONS.md)** - Key decisions and rationale for hybrid approach
+3. **[ROADMAP.md](./ROADMAP.md)** - 12-week implementation roadmap with phases and priorities
+4. **[IMPLEMENTATION_PATTERNS.md](./IMPLEMENTATION_PATTERNS.md)** - Battle-tested patterns from Superhuman/Inbox Zero
+5. **[SEARCH_ARCHITECTURE.md](./SEARCH_ARCHITECTURE.md)** - Hybrid search with local cache and server proxy
+6. **[PUSH_NOTIFICATIONS.md](./PUSH_NOTIFICATIONS.md)** - Gmail Push via Pub/Sub for real-time updates
+7. **[SNOOZE_ARCHITECTURE.md](./SNOOZE_ARCHITECTURE.md)** - Redis sorted sets for time-based features
+8. **[TECH_STACK.md](./TECH_STACK.md)** - Technology choices with detailed rationale
+9. **[BUSINESS_OVERVIEW.md](./BUSINESS_OVERVIEW.md)** - Product requirements and feature specifications
+10. **[FEATURES.md](./FEATURES.md)** - Comprehensive feature documentation with all email functionality
+11. **[SECURITY.md](./SECURITY.md)** - Security architecture, encryption, and authentication
+12. **[API_DESIGN.md](./API_DESIGN.md)** - Hybrid API design with metadata sync and search proxy
+13. **[PLATFORM_GUIDE.md](./PLATFORM_GUIDE.md)** - Platform-specific implementation details
+14. **[PERFORMANCE.md](./PERFORMANCE.md)** - Performance targets and optimization strategies
+15. **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Infrastructure setup and deployment procedures
+16. **[UI_DESIGN.md](./UI_DESIGN.md)** - Complete UI/UX design system and layout specifications
+17. **[KEYBOARD_SHORTCUTS.md](./KEYBOARD_SHORTCUTS.md)** - Comprehensive keyboard shortcut reference
+18. **[DATA_STRATEGY.md](./DATA_STRATEGY.md)** - Data durability, backup, and sync strategies
 
 ## Quick Start
 

@@ -1,0 +1,46 @@
+// .devcontainer/devcontainer.json
+{
+	"name": "Finito Mail Dev Container",
+
+	// Use a pre-built, feature-rich image with Node.js 20
+	"image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+
+	// --- Explicitly forward the Next.js port ---
+	// This ensures VS Code forwards port 3000 from container to host
+	"forwardPorts": [3000],
+
+	// --- Port configuration ---
+	"portsAttributes": {
+		"3000": {
+			"label": "Next.js Dev Server",
+			"onAutoForward": "notify"
+		}
+	},
+
+	// --- Recommended VS Code extensions ---
+	"customizations": {
+		"vscode": {
+			// Pre-install extensions for consistent development experience
+			"extensions": [
+				"dbaeumer.vscode-eslint",
+				"esbenp.prettier-vscode",
+				"yoavbls.pretty-ts-errors",
+				"bradlc.vscode-tailwindcss"
+			]
+		}
+	},
+
+	// Run commands after the container is created
+	"postCreateCommand": "npm install",
+
+	// Set environment variables inside the container
+	"containerEnv": {
+		"PORT": "3000",
+		"NEXT_HOST": "0.0.0.0"
+	},
+
+	// Features to add to the dev container
+	"features": {
+		"ghcr.io/devcontainers/features/git:1": {}
+	}
+}

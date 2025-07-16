@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { Email } from '@finito/types'
-import { GmailClient } from '@finito/provider-client'
 
 interface EmailStore {
   selectedEmailId: string | null
@@ -8,7 +7,6 @@ interface EmailStore {
   isComposing: boolean
   draftEmail: Partial<Email> | null
   provider: 'gmail' | 'outlook' | null
-  gmailClient: GmailClient | null
   
   setSelectedEmail: (id: string | null) => void
   toggleEmailSelection: (id: string) => void
@@ -16,7 +14,6 @@ interface EmailStore {
   setComposing: (isComposing: boolean) => void
   setDraftEmail: (draft: Partial<Email> | null) => void
   setProvider: (provider: 'gmail' | 'outlook' | null) => void
-  initializeGmailClient: (accessToken: string) => void
 }
 
 export const useEmailStore = create<EmailStore>((set) => ({
@@ -25,7 +22,6 @@ export const useEmailStore = create<EmailStore>((set) => ({
   isComposing: false,
   draftEmail: null,
   provider: null,
-  gmailClient: null,
   
   setSelectedEmail: (id) => set({ selectedEmailId: id }),
   
@@ -46,9 +42,4 @@ export const useEmailStore = create<EmailStore>((set) => ({
   setDraftEmail: (draft) => set({ draftEmail: draft }),
   
   setProvider: (provider) => set({ provider }),
-  
-  initializeGmailClient: (accessToken) => {
-    const client = new GmailClient(accessToken)
-    set({ gmailClient: client })
-  },
 }))

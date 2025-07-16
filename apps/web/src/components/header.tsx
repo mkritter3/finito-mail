@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { useEmailSync } from '@/hooks/use-email-sync'
+import { emailSync } from '@finito/provider-client'
 import { RefreshCw } from 'lucide-react'
 
 export function Header() {
   const { logout } = useAuth()
-  const { syncEmails, isSyncing, syncProgress, lastSyncTime } = useEmailSync()
   const [userEmail, setUserEmail] = useState<string>('')
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
 
   useEffect(() => {
     // Get user info from token
@@ -20,9 +21,17 @@ export function Header() {
     }
   }, [])
 
-  const handleSync = () => {
+  const handleSync = async () => {
     if (!isSyncing) {
-      syncEmails()
+      setIsSyncing(true)
+      try {
+        await emailSync.syncRecentEmails(5)
+        setLastSyncTime(new Date())
+      } catch (error) {
+        console.error('Sync failed:', error)
+      } finally {
+        setIsSyncing(false)
+      }
     }
   }
 
@@ -48,11 +57,7 @@ export function Header() {
           title={`Last sync: ${formatLastSync()}`}
         >
           <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-          {isSyncing ? (
-            <>Syncing {syncProgress.current}/{syncProgress.total}</>
-          ) : (
-            'Sync'
-          )}
+          {isSyncing ? 'Syncing...' : 'Sync'}
         </button>
         <span className="text-xs text-muted-foreground">
           {formatLastSync()}

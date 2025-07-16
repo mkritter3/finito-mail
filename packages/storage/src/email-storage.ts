@@ -82,7 +82,7 @@ export class EmailStorage {
     if (filters.from) {
       collection = collection.filter(email => 
         email.from.email.toLowerCase().includes(filters.from!.toLowerCase()) ||
-        email.from.name?.toLowerCase().includes(filters.from!.toLowerCase())
+        (email.from.name?.toLowerCase().includes(filters.from!.toLowerCase()) ?? false)
       );
     }
 
@@ -140,7 +140,7 @@ export class EmailStorage {
     }
 
     // Update thread metadata
-    for (const [threadId, threadEmails] of threadMap) {
+    for (const [threadId, _threadEmails] of threadMap) {
       const allThreadEmails = await this.getEmailsByThread(threadId);
       
       const participants = new Map<string, string>();

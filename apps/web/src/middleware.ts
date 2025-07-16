@@ -11,15 +11,10 @@ export function middleware(request: NextRequest) {
 
   // Check for authentication on protected routes
   if (pathname.startsWith('/mail')) {
-    // In a real app, you'd validate the token server-side
-    // For now, we'll just check if it exists in the request
-    const hasAuth = request.cookies.has('gmail_access_token')
-    
-    if (!hasAuth) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/auth'
-      return NextResponse.redirect(url)
-    }
+    // Since we use Web Worker token storage (not cookies), we'll handle auth client-side
+    // The mail layout will check authentication and redirect if needed
+    // For now, allow access to /mail routes - client-side auth check will handle redirects
+    return NextResponse.next()
   }
 
   return NextResponse.next()

@@ -103,8 +103,8 @@ export class CryptoService {
 
     return {
       encrypted: this.arrayBufferToBase64(ciphertext),
-      salt: this.arrayBufferToBase64(salt),
-      iv: this.arrayBufferToBase64(iv),
+      salt: this.arrayBufferToBase64(salt.buffer as ArrayBuffer),
+      iv: this.arrayBufferToBase64(iv.buffer as ArrayBuffer),
     };
   }
 
@@ -171,8 +171,8 @@ export class CryptoService {
   private arrayBufferToBase64(buffer: ArrayBuffer): string {
     const bytes = new Uint8Array(buffer);
     let binary = '';
-    for (const byte of bytes) {
-      binary += String.fromCharCode(byte);
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
     }
     return btoa(binary);
   }

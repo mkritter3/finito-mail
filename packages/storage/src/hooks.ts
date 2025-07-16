@@ -13,7 +13,8 @@ export function initializeDatabase(): FinitoDatabase {
 
 export function useDatabase(): FinitoDatabase {
   if (!db) {
-    throw new Error('Database not initialized. Call initializeDatabase() first.');
+    // Auto-initialize database if not already initialized
+    db = new FinitoDatabase();
   }
   return db;
 }

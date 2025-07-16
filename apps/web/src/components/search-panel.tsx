@@ -5,7 +5,7 @@ interface SearchPanelProps {
   onClose: () => void
 }
 
-export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
+export function SearchPanel({ isOpen, onClose: _ }: SearchPanelProps) {
   if (!isOpen) return null
 
   return (

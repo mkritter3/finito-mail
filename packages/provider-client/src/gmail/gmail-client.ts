@@ -1,4 +1,24 @@
+import { pkceService } from '../auth/pkce';
+import { tokenManager } from '../auth/token-manager';
 import type { Email, EmailAddress, Attachment } from '@finito/types';
+import { GMAIL_SCOPES_STRING } from './scopes';
+import { 
+  batchGetMessages, 
+  getMessagesWithPagination, 
+  extractBody,
+  decodeBase64Url,
+  type GmailListOptions 
+} from './api-utils';
+
+// Gmail OAuth configuration
+const getGmailConfig = () => ({
+  authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenEndpoint: 'https://oauth2.googleapis.com/token',
+  scope: GMAIL_SCOPES_STRING,
+  // Client ID will come from environment variable
+  clientId: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '' : '',
+  redirectUri: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : '',
+});
 
 export interface GmailMessage {
   id: string;
@@ -25,8 +45,105 @@ export interface GmailMessagePart {
 
 export class GmailClient {
   private readonly baseUrl = 'https://gmail.googleapis.com/gmail/v1';
+  private readonly provider = 'gmail';
 
-  constructor(private accessToken: string) {}
+  /**
+   * Start OAuth flow with PKCE
+   */
+  async startAuthFlow(): Promise<string> {
+    // Generate PKCE challenge
+    const challenge = await pkceService.generateChallenge();
+    
+    // Store code verifier in session storage for callback
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('gmail_code_verifier', challenge.codeVerifier);
+    }
+    
+    // Build authorization URL
+    const config = getGmailConfig();
+    const authUrl = pkceService.buildAuthorizationUrl({
+      authEndpoint: config.authEndpoint,
+      clientId: config.clientId,
+      redirectUri: config.redirectUri,
+      scope: config.scope,
+      codeChallenge: challenge.codeChallenge,
+      state: this.generateState(),
+      additionalParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
+    });
+    
+    return authUrl;
+  }
+
+  /**
+   * Handle OAuth callback
+   */
+  async handleCallback(code: string, state: string): Promise<void> {
+    // Verify state parameter
+    const savedState = sessionStorage.getItem('gmail_auth_state');
+    if (state !== savedState) {
+      throw new Error('Invalid state parameter');
+    }
+    
+    // Get code verifier
+    const codeVerifier = sessionStorage.getItem('gmail_code_verifier');
+    if (!codeVerifier) {
+      throw new Error('Missing code verifier');
+    }
+    
+    // Exchange code for tokens using the API route (which has access to client_secret)
+    const response = await fetch('/api/auth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        code,
+        verifier: codeVerifier,
+        redirect_uri: getGmailConfig().redirectUri,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Token exchange failed: ${error}`);
+    }
+
+    const tokens = await response.json();
+    console.log('[GmailClient] Token exchange successful, storing tokens...');
+    
+    // Store tokens securely in Web Worker
+    try {
+      await tokenManager.storeTokens(this.provider, {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresIn: tokens.expires_in,
+      });
+      console.log('[GmailClient] Tokens stored successfully');
+    } catch (error) {
+      console.error('[GmailClient] Failed to store tokens:', error);
+      throw error;
+    }
+    
+    // Clean up session storage
+    sessionStorage.removeItem('gmail_code_verifier');
+    sessionStorage.removeItem('gmail_auth_state');
+  }
+
+  /**
+   * Get authenticated access token
+   */
+  private async getAccessToken(): Promise<string> {
+    console.log('[GmailClient] Getting access token for provider:', this.provider);
+    const token = await tokenManager.getAccessToken(this.provider);
+    console.log('[GmailClient] Token retrieved:', token ? 'exists' : 'null');
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+    return token;
+  }
 
   /**
    * List messages from Gmail
@@ -41,6 +158,7 @@ export class GmailClient {
     nextPageToken?: string;
     resultSizeEstimate: number;
   }> {
+    const accessToken = await this.getAccessToken();
     const url = new URL(`${this.baseUrl}/users/me/messages`);
     
     if (params?.q) url.searchParams.set('q', params.q);
@@ -48,7 +166,7 @@ export class GmailClient {
     if (params?.maxResults) url.searchParams.set('maxResults', params.maxResults.toString());
     if (params?.labelIds?.length) url.searchParams.set('labelIds', params.labelIds.join(','));
 
-    const response = await this.makeRequest(url.toString());
+    const response = await this.makeRequest(url.toString(), { accessToken });
     return response;
   }
 
@@ -56,17 +174,39 @@ export class GmailClient {
    * Get a single message
    */
   async getMessage(id: string): Promise<GmailMessage> {
+    const accessToken = await this.getAccessToken();
     const url = `${this.baseUrl}/users/me/messages/${id}`;
-    return this.makeRequest(url);
+    return this.makeRequest(url, { accessToken });
   }
 
   /**
    * Get messages in batch (more efficient)
    */
   async batchGetMessages(ids: string[]): Promise<Email[]> {
-    // Gmail batch API would be ideal here, but for simplicity we'll use Promise.all
-    const messages = await Promise.all(ids.map(id => this.getMessage(id)));
+    const accessToken = await this.getAccessToken();
+    
+    // Use the improved batch API from api-utils
+    const messages = await batchGetMessages(ids, accessToken);
     return messages.map(msg => this.convertGmailToEmail(msg));
+  }
+
+  /**
+   * Get recent emails (convenience method for the First-Light implementation)
+   */
+  async getRecentEmails(count: number = 5): Promise<Email[]> {
+    // Get list of recent message IDs
+    const listResponse = await this.listMessages({
+      maxResults: count,
+      labelIds: ['INBOX']
+    });
+
+    if (!listResponse.messages || listResponse.messages.length === 0) {
+      return [];
+    }
+
+    // Get full message details for each message
+    const messageIds = listResponse.messages.map(msg => msg.id);
+    return this.batchGetMessages(messageIds);
   }
 
   /**
@@ -82,6 +222,7 @@ export class GmailClient {
     body?: string;
     attachments?: Array<{ filename: string; mimeType: string; data: ArrayBuffer }>;
   }): Promise<{ id: string; threadId: string }> {
+    const accessToken = await this.getAccessToken();
     let encodedMessage: string;
     
     if (email.raw) {
@@ -99,6 +240,7 @@ export class GmailClient {
     }
 
     const response = await this.makeRequest(`${this.baseUrl}/users/me/messages/send`, {
+      accessToken,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -119,10 +261,12 @@ export class GmailClient {
     subject: string;
     body: string;
   }): Promise<{ id: string; message: { id: string; threadId: string } }> {
+    const accessToken = await this.getAccessToken();
     const message = this.createMimeMessage(email);
     const encodedMessage = btoa(message).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
     const response = await this.makeRequest(`${this.baseUrl}/users/me/drafts`, {
+      accessToken,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -145,7 +289,9 @@ export class GmailClient {
     addLabelIds?: string[],
     removeLabelIds?: string[]
   ): Promise<void> {
+    const accessToken = await this.getAccessToken();
     await this.makeRequest(`${this.baseUrl}/users/me/messages/${id}/modify`, {
+      accessToken,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -186,7 +332,9 @@ export class GmailClient {
    * Move to trash
    */
   async trash(id: string): Promise<void> {
+    const accessToken = await this.getAccessToken();
     await this.makeRequest(`${this.baseUrl}/users/me/messages/${id}/trash`, {
+      accessToken,
       method: 'POST',
     });
   }
@@ -195,8 +343,10 @@ export class GmailClient {
    * Get attachment
    */
   async getAttachment(messageId: string, attachmentId: string): Promise<ArrayBuffer> {
+    const accessToken = await this.getAccessToken();
     const response = await this.makeRequest(
-      `${this.baseUrl}/users/me/messages/${messageId}/attachments/${attachmentId}`
+      `${this.baseUrl}/users/me/messages/${messageId}/attachments/${attachmentId}`,
+      { accessToken }
     );
     
     // Decode base64url data
@@ -213,7 +363,9 @@ export class GmailClient {
    * Watch for changes using Gmail push notifications
    */
   async watch(topicName: string): Promise<{ historyId: string; expiration: string }> {
+    const accessToken = await this.getAccessToken();
     const response = await this.makeRequest(`${this.baseUrl}/users/me/watch`, {
+      accessToken,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -242,19 +394,22 @@ export class GmailClient {
     nextPageToken?: string;
     historyId: string;
   }> {
+    const accessToken = await this.getAccessToken();
     const url = new URL(`${this.baseUrl}/users/me/history`);
     url.searchParams.set('startHistoryId', startHistoryId);
 
-    return this.makeRequest(url.toString());
+    return this.makeRequest(url.toString(), { accessToken });
   }
 
   // Helper methods
-  private async makeRequest(url: string, options?: RequestInit): Promise<any> {
+  private async makeRequest(url: string, options?: RequestInit & { accessToken: string }): Promise<any> {
+    const { accessToken, ...fetchOptions } = options || { accessToken: '' };
+    
     const response = await fetch(url, {
-      ...options,
+      ...fetchOptions,
       headers: {
-        Authorization: `Bearer ${this.accessToken}`,
-        ...options?.headers,
+        Authorization: `Bearer ${accessToken}`,
+        ...fetchOptions?.headers,
       },
     });
 
@@ -286,7 +441,7 @@ export class GmailClient {
     return headers.join('\r\n') + '\r\n' + email.body;
   }
 
-  private convertGmailToEmail(gmail: GmailMessage): Email {
+  convertGmailToEmail(gmail: GmailMessage): Email {
     const headers = gmail.payload.headers.reduce((acc, header) => {
       acc[header.name.toLowerCase()] = header.value;
       return acc;
@@ -340,22 +495,8 @@ export class GmailClient {
   }
 
   private extractBody(payload: GmailMessagePart): { text: string; html?: string } {
-    let text = '';
-    let html = '';
-
-    const extractFromPart = (part: GmailMessagePart) => {
-      if (part.mimeType === 'text/plain' && part.body.data) {
-        text = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-      } else if (part.mimeType === 'text/html' && part.body.data) {
-        html = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-      } else if (part.parts) {
-        part.parts.forEach(extractFromPart);
-      }
-    };
-
-    extractFromPart(payload);
-
-    return { text: text || html, html: html || undefined };
+    // Use the improved extractBody utility that handles decoding properly
+    return extractBody(payload);
   }
 
   private extractAttachments(payload: GmailMessagePart, emailId: string): Attachment[] {
@@ -388,4 +529,16 @@ export class GmailClient {
     if (labelIds.includes('SPAM')) return 'spam';
     return 'all';
   }
+
+  /**
+   * Generate random state for OAuth
+   */
+  private generateState(): string {
+    const state = Math.random().toString(36).substring(7);
+    sessionStorage.setItem('gmail_auth_state', state);
+    return state;
+  }
 }
+
+// Export singleton instance
+export const gmailClient = new GmailClient();

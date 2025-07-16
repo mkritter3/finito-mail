@@ -1,5 +1,5 @@
 import { FinitoDatabase } from './database';
-import type { Todo, TodoEmailLink } from '@finito/types';
+import type { Todo } from '@finito/types';
 
 export class TodoStorage {
   constructor(private db: FinitoDatabase) {}

@@ -9,6 +9,7 @@ import { SearchPanel } from '@/components/search-panel'
 import { CommandPalette } from '@/components/command-palette'
 import { KeyboardShortcutsDialog } from '@/components/keyboard-shortcuts-dialog'
 import { ComposeDialog } from '@/components/compose-dialog'
+import { initializeDatabase } from '@finito/storage'
 
 export default function MailLayout({
   children,
@@ -23,6 +24,16 @@ export default function MailLayout({
   const [composeOpen, setComposeOpen] = useState(false)
   const [composeMode, setComposeMode] = useState<'compose' | 'reply' | 'replyAll' | 'forward'>('compose')
   const [replyToEmail, setReplyToEmail] = useState<any>(null)
+
+  // Initialize database synchronously to avoid hook timing issues
+  const [dbInitialized, setDbInitialized] = useState(false)
+  
+  useEffect(() => {
+    if (!dbInitialized) {
+      initializeDatabase()
+      setDbInitialized(true)
+    }
+  }, [dbInitialized])
 
   // Listen for compose event from sidebar
   useEffect(() => {
