@@ -19,6 +19,10 @@ const folders = [
   { id: 'trash', label: 'Trash', icon: '🗑️' },
 ]
 
+const specialItems = [
+  { id: 'onboarding', label: 'Instant Triage', icon: '✨', href: '/onboarding' },
+]
+
 export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const unreadCount = useUnreadCount()
@@ -62,6 +66,33 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           {isOpen ? 'Compose' : '+'}
         </button>
       </div>
+
+      {/* Special items */}
+      <nav className="space-y-1 px-2 mb-4">
+        {specialItems.map((item) => {
+          const isActive = pathname === item.href
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2 rounded-md transition-colors',
+                isActive
+                  ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                  : 'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <span className="text-lg">{item.icon}</span>
+              {isOpen && (
+                <span className="flex-1 font-medium">{item.label}</span>
+              )}
+            </Link>
+          )
+        })}
+      </nav>
+
+      {/* Divider */}
+      {isOpen && <div className="border-t border-border mx-4 mb-4" />}
 
       {/* Folder list */}
       <nav className="space-y-1 px-2">
