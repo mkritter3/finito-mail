@@ -1,60 +1,71 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@finito/ui'
-import { gmailClient, getTokenManager, getWorkerState } from '@finito/provider-client'
 
 export default function AuthPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
-  const [workerDebugInfo, setWorkerDebugInfo] = useState<string>('')
 
   useEffect(() => {
+    // Check if there's an error from OAuth callback
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      setError(`Authentication failed: ${errorParam}`)
+    }
+
     // Check if already authenticated
     const checkAuth = async () => {
       try {
-        // Get token manager singleton instance
-        const tokenManager = getTokenManager()
-        
-        // Check authentication status
-        const authStatus = await tokenManager.checkAuth('gmail')
-        if (authStatus.authenticated) {
-          router.push('/mail')
+        const token = localStorage.getItem('finito_auth_token')
+        if (token) {
+          // Verify token with API
+          const response = await fetch('/api/auth/me', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          
+          if (response.ok) {
+            router.push('/mail')
+            return
+          } else {
+            // Token is invalid, remove it
+            localStorage.removeItem('finito_auth_token')
+          }
         }
       } catch (error) {
         console.error('Error checking auth:', error)
-        // Log worker state for debugging
-        const state = getWorkerState()
-        setWorkerDebugInfo(`Worker state: ${state}`)
+        localStorage.removeItem('finito_auth_token')
       } finally {
         setIsCheckingAuth(false)
       }
     }
     checkAuth()
-  }, [router])
+  }, [router, searchParams])
 
   const handleGoogleAuth = async () => {
     try {
       setIsLoading(true)
       setError(null)
 
-      // Log worker state before starting auth flow
-      const workerState = getWorkerState()
-      console.log('[Auth Page] Worker state before auth:', workerState)
-      setWorkerDebugInfo(`Worker state: ${workerState}`)
-
-      // Get authorization URL
-      const authUrl = await gmailClient.startAuthFlow()
+      // Get authorization URL from API
+      const response = await fetch('/api/auth/google')
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to initialize authentication')
+      }
 
       // Redirect to Google auth
-      window.location.href = authUrl
+      window.location.href = data.authUrl
     } catch (error) {
       console.error('Auth error:', error)
-      const workerState = getWorkerState()
-      setError(`Failed to initialize authentication. Worker state: ${workerState}`)
+      setError(error instanceof Error ? error.message : 'Failed to initialize authentication')
       setIsLoading(false)
     }
   }
@@ -84,9 +95,6 @@ export default function AuthPage() {
           {error && (
             <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4">
               <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
-              {workerDebugInfo && (
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{workerDebugInfo}</p>
-              )}
             </div>
           )}
           

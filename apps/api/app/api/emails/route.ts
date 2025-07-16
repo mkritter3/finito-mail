@@ -1,121 +1,124 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { withAuth } from '../../lib/auth';
+import { Client } from 'pg';
+import { EmailSyncService } from '../../lib/email-sync';
 
 const emailQuerySchema = z.object({
-  folder: z.string().optional(),
   limit: z.coerce.number().min(1).max(100).default(50),
   offset: z.coerce.number().min(0).default(0),
   is_read: z.string().transform(val => val === 'true').optional(),
-  is_starred: z.string().transform(val => val === 'true').optional(),
   from: z.string().optional(),
   date_start: z.string().optional(),
   date_end: z.string().optional(),
 });
 
 /**
- * GET /api/emails - Get email metadata
+ * GET /api/emails - Get email metadata for authenticated user
  */
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request) => {
   try {
     const { searchParams } = new URL(request.url);
     const query = emailQuerySchema.parse(Object.fromEntries(searchParams));
     
-    // TODO: Get user_id from auth context
-    const userId = 'current-user';
+    const userId = request.user.id;
     
-    let dbQuery = supabase
-      .from('emails')
-      .select('*')
-      .eq('user_id', userId)
-      .order('date', { ascending: false })
-      .range(query.offset, query.offset + query.limit - 1);
+    // Create database connection
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL!,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
     
-    // Apply filters
-    if (query.folder) {
-      dbQuery = dbQuery.contains('labels', [query.folder.toUpperCase()]);
+    await client.connect();
+    
+    try {
+      // Base query
+      let sqlQuery = `
+        SELECT
+          id,
+          gmail_message_id,
+          gmail_thread_id,
+          subject,
+          snippet,
+          from_address,
+          to_addresses,
+          received_at,
+          is_read
+        FROM email_metadata
+        WHERE user_id = $1
+      `;
+      
+      const params = [userId];
+      let paramIndex = 2;
+      
+      // Apply filters
+      if (query.is_read !== undefined) {
+        sqlQuery += ` AND is_read = $${paramIndex}`;
+        params.push(query.is_read);
+        paramIndex++;
+      }
+      
+      if (query.from) {
+        sqlQuery += ` AND from_address->>'email' ILIKE $${paramIndex}`;
+        params.push(`%${query.from}%`);
+        paramIndex++;
+      }
+      
+      if (query.date_start) {
+        sqlQuery += ` AND received_at >= $${paramIndex}`;
+        params.push(query.date_start);
+        paramIndex++;
+      }
+      
+      if (query.date_end) {
+        sqlQuery += ` AND received_at <= $${paramIndex}`;
+        params.push(query.date_end);
+        paramIndex++;
+      }
+      
+      // Add ordering and pagination
+      sqlQuery += ` ORDER BY received_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      params.push(query.limit, query.offset);
+      
+      const result = await client.query(sqlQuery, params);
+      
+      return NextResponse.json({ emails: result.rows });
+    } finally {
+      await client.end();
     }
-    
-    if (query.is_read !== undefined) {
-      dbQuery = dbQuery.eq('is_read', query.is_read);
-    }
-    
-    if (query.is_starred !== undefined) {
-      dbQuery = dbQuery.eq('is_starred', query.is_starred);
-    }
-    
-    if (query.from) {
-      dbQuery = dbQuery.or(`from_email.ilike.%${query.from}%,from_name.ilike.%${query.from}%`);
-    }
-    
-    if (query.date_start) {
-      dbQuery = dbQuery.gte('date', query.date_start);
-    }
-    
-    if (query.date_end) {
-      dbQuery = dbQuery.lte('date', query.date_end);
-    }
-    
-    const { data: emails, error } = await dbQuery;
-    
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: 'Database error' }, { status: 500 });
-    }
-    
-    return NextResponse.json({ emails });
   } catch (error) {
     console.error('Email fetch error:', error);
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
-}
-
-const emailBatchSchema = z.object({
-  emails: z.array(z.object({
-    id: z.string(),
-    user_id: z.string(),
-    thread_id: z.string(),
-    subject: z.string(),
-    from_email: z.string(),
-    from_name: z.string().optional(),
-    date: z.string().transform(val => new Date(val)),
-    labels: z.array(z.string()),
-    is_read: z.boolean(),
-    is_starred: z.boolean(),
-    snippet: z.string(),
-    sync_state: z.record(z.any()),
-    created_at: z.string().transform(val => new Date(val)),
-  })),
 });
 
 /**
- * POST /api/emails - Store email metadata in bulk
+ * POST /api/emails - Trigger email sync for authenticated user
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request) => {
   try {
-    const body = await request.json();
-    const { emails } = emailBatchSchema.parse(body);
+    const userId = request.user.id;
     
-    // Insert emails into PostgreSQL
-    const { error } = await supabase
-      .from('emails')
-      .upsert(emails, {
-        onConflict: 'id',
-        ignoreDuplicates: false,
+    // Create email sync service
+    const emailSync = new EmailSyncService();
+    
+    // Trigger synchronous sync (MVP approach)
+    const result = await emailSync.syncRecentEmails(userId);
+    
+    if (result.success) {
+      return NextResponse.json({ 
+        success: true, 
+        message: `Synced ${result.count} emails`,
+        count: result.count
       });
-    
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    } else {
+      return NextResponse.json({ 
+        success: false, 
+        error: result.error 
+      }, { status: 500 });
     }
-    
-    return NextResponse.json({ success: true, count: emails.length });
   } catch (error) {
-    console.error('Email store error:', error);
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+    console.error('Email sync error:', error);
+    return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
   }
-}
+});
