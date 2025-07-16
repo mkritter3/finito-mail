@@ -16,43 +16,205 @@ This document defines the immutable system architecture for Finito Mail. It serv
 │   Web App   │  Desktop App    │      Mobile Apps            │
 │  (Next.js)  │   (Electron)    │  (React Native/PWA)         │
 │      ↓             ↓                    ↓                    │
-│         Direct Provider API Access (PKCE)                    │
-│              ↓             ↓                                 │
-│         IndexedDB     IndexedDB                             │
-│         (50GB+)       (50GB+)                               │
+│         Hybrid Storage: IndexedDB + API                      │
+│         - Bodies: IndexedDB (50GB+)                         │
+│         - Metadata: From Backend API                        │
 └─────────────┴─────────────────┴─────────────────────────────┘
-                       ↓ Metadata Only ↓
+                       ↓ Metadata + Coordination ↓
 ┌──────────────────────────────────────────────────────────────┐
-│                   MINIMAL BACKEND                            │
+│                  HYBRID BACKEND                              │
 ├─────────────┬─────────────────┬─────────────────────────────┤
-│   Vercel    │    Upstash      │    Cloudflare              │
-│  (Auth API) │  (Rate Limit)   │  (Webhook Handler)         │
-│  - PKCE     │  - 10k req free │  - 100k req/day free       │
-│  - Tokens   │  - User quotas  │  - Push queue               │
+│ PostgreSQL  │     Redis       │    Cloudflare              │
+│ (Supabase)  │   (Upstash)     │  (Webhook Handler)         │
+│ - Metadata  │  - Snooze       │  - 100k req/day free       │
+│ - Sync      │  - Rate Limit   │  - Push notifications       │
+│ - Users     │  - Sessions     │  - Background jobs          │
+└─────────────┴─────────────────┴─────────────────────────────┘
+                       ↓ Provider API Access ↓
+┌──────────────────────────────────────────────────────────────┐
+│                   EMAIL PROVIDERS                            │
+├─────────────┬─────────────────┬─────────────────────────────┤
+│   Gmail     │    Outlook      │      Others                 │
+│    API      │      API        │     (Future)                │
 └─────────────┴─────────────────┴─────────────────────────────┘
 ```
 
 ## Architectural Principles
 
-### 1. Client-First Architecture
-- **Principle**: 99% of operations happen client-side
-- **Implementation**: Direct provider API access with PKCE OAuth
-- **Benefit**: Zero server costs, infinite scalability, <50ms latency
+### 1. Hybrid Backend-for-Frontend Architecture
+- **Principle**: Strategic server storage for coordination, client storage for content
+- **Implementation**: PostgreSQL for metadata, IndexedDB for email bodies
+- **Benefit**: Best of both worlds - coordination + performance
 
-### 2. IndexedDB as Primary Storage
-- **Principle**: Browser is the database (50GB+ available)
-- **Implementation**: All emails stored locally, encrypted
-- **Benefit**: No server storage costs, instant access
+### 2. Content Privacy by Design
+- **Principle**: Email bodies never touch our servers
+- **Implementation**: Bodies stored locally, encrypted in IndexedDB
+- **Benefit**: Maximum privacy, reduced server costs, instant access
 
-### 3. Direct Provider Access
-- **Principle**: Cut out the middleman completely
-- **Implementation**: OAuth2 PKCE flow for secure client auth
-- **Benefit**: No API gateway needed, no rate limit proxying
+### 3. Database-Driven Consistency
+- **Principle**: Each database for what it does best
+- **Implementation**: PostgreSQL for relations, Redis for time-based operations
+- **Benefit**: Reliability, scalability, appropriate data modeling
 
 ### 4. Minimal Server Footprint
 - **Principle**: Server only for what browsers can't do
 - **Implementation**: Auth coordination, webhook reception, push queue
 - **Benefit**: $35/month serves 1000+ users
+
+## Storage Architecture
+
+### PostgreSQL (Primary Metadata Store)
+**Purpose**: Source of truth for email metadata and user data
+**Provider**: Supabase (generous free tier)
+
+**Schema**:
+```sql
+-- Email metadata (NO content stored)
+emails (
+  id            TEXT PRIMARY KEY,
+  user_id       UUID REFERENCES users(id),
+  thread_id     TEXT,
+  subject       TEXT,
+  from_email    TEXT,
+  from_name     TEXT,
+  date          TIMESTAMP,
+  labels        TEXT[],
+  is_read       BOOLEAN DEFAULT false,
+  is_starred    BOOLEAN DEFAULT false,
+  snippet       TEXT,
+  sync_state    JSONB,
+  created_at    TIMESTAMP DEFAULT NOW()
+);
+
+-- User accounts and preferences
+users (
+  id            UUID PRIMARY KEY,
+  email         TEXT UNIQUE,
+  provider      TEXT, -- 'gmail', 'outlook'
+  last_sync     TIMESTAMP,
+  preferences   JSONB,
+  created_at    TIMESTAMP DEFAULT NOW()
+);
+
+-- Sync coordination
+sync_checkpoints (
+  user_id       UUID REFERENCES users(id),
+  provider      TEXT,
+  last_history_id TEXT,
+  processed_count INTEGER DEFAULT 0,
+  total_count   INTEGER DEFAULT 0,
+  status        TEXT DEFAULT 'pending',
+  updated_at    TIMESTAMP DEFAULT NOW()
+);
+
+-- Outbox for reliable Redis operations
+outbox (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID REFERENCES users(id),
+  operation     TEXT, -- 'snooze', 'archive', 'star', etc.
+  payload       JSONB,
+  status        TEXT DEFAULT 'pending',
+  retry_count   INTEGER DEFAULT 0,
+  created_at    TIMESTAMP DEFAULT NOW()
+);
+```
+
+### Redis (Time-Based & Ephemeral Data)
+**Purpose**: Time-sensitive operations and caching
+**Provider**: Upstash (10k commands/day free)
+
+**Data Structures**:
+```redis
+# Snooze functionality (sorted sets)
+snoozed_emails:{user_id}  # ZADD with timestamp as score
+
+# Rate limiting (counters)
+rate_limit:{user_id}:{window}  # INCR with TTL
+
+# Session management
+session:{token}  # SETEX with user data
+
+# Push notification deduplication
+webhook_seen:{id}  # SETEX with short TTL
+
+# Temporary sync state
+sync_progress:{user_id}  # HSET with progress data
+```
+
+### IndexedDB (Client-Side Content Store)
+**Purpose**: Email bodies, attachments, and local cache
+**Size**: 50GB+ available per origin
+
+**Schema**:
+```typescript
+// Email bodies (encrypted)
+email_bodies: {
+  id: string;           // Matches PostgreSQL emails.id
+  html_body: string;    // Encrypted HTML content
+  text_body: string;    // Encrypted text content
+  raw_body?: string;    // Optional raw MIME
+  encryption_iv: string;
+  last_accessed: Date;
+}
+
+// Attachments (encrypted)
+attachments: {
+  id: string;
+  email_id: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+  encrypted_data: ArrayBuffer;
+  encryption_iv: string;
+}
+
+// Cached metadata for performance
+email_headers: {
+  id: string;
+  // Subset of PostgreSQL emails table
+  // Synced for offline access
+}
+
+// Local search index
+search_index: {
+  email_id: string;
+  indexed_content: string;
+  last_updated: Date;
+}
+```
+
+## Data Consistency Strategy
+
+### Transactional Outbox Pattern
+For operations that affect both PostgreSQL and Redis:
+
+```typescript
+// Example: Snooze email
+async function snoozeEmail(emailId: string, snoozeUntil: Date) {
+  // 1. Atomic write to PostgreSQL
+  await db.transaction(async (trx) => {
+    await trx.emails.update(emailId, { 
+      labels: [...labels, 'snoozed'],
+      is_visible: false 
+    });
+    
+    // 2. Add to outbox in same transaction
+    await trx.outbox.insert({
+      operation: 'snooze',
+      payload: { emailId, snoozeUntil },
+      status: 'pending'
+    });
+  });
+  
+  // 3. Background worker processes outbox
+  // Updates Redis sorted set reliably
+}
+```
+
+### Background Reconciliation
+- Periodic jobs ensure PostgreSQL and Redis consistency
+- Self-healing system recovers from failures
+- Idempotent operations prevent duplicate processing
 
 ## Component Architecture
 
