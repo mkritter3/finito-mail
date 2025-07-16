@@ -49,7 +49,12 @@ export class EmailSyncService {
   /**
    * Synchronous sync for MVP - fetch 50 recent emails
    */
-  async syncRecentEmails(userId: string): Promise<{ success: boolean; count: number; error?: string }> {
+  async syncRecentEmails(userId: string): Promise<{ success: boolean; count: number; error?: string; timing?: { total: number; fetch: number; transform: number; store: number } }> {
+    const startTime = Date.now();
+    let fetchTime = 0;
+    let transformTime = 0;
+    let storeTime = 0;
+    
     try {
       await this.dbClient.connect();
 
@@ -75,6 +80,7 @@ export class EmailSyncService {
       });
 
       // List recent messages (50 max for MVP)
+      const fetchStart = Date.now();
       const messagesResponse = await this.gmailClient.listMessages(client, {
         maxResults: 50,
         labelIds: ['INBOX'],
@@ -100,12 +106,24 @@ export class EmailSyncService {
           // Continue with other messages
         }
       }
+      
+      fetchTime = Date.now() - fetchStart;
 
       // Transform and store messages
+      const transformStart = Date.now();
       const emailMetadata = messages.map(msg => this.transformGmailMessage(msg, userId));
-      await this.storeEmailMetadata(emailMetadata);
+      transformTime = Date.now() - transformStart;
 
-      return { success: true, count: emailMetadata.length };
+      const storeStart = Date.now();
+      await this.storeEmailMetadata(emailMetadata);
+      storeTime = Date.now() - storeStart;
+
+      const totalTime = Date.now() - startTime;
+      const timing = { total: totalTime, fetch: fetchTime, transform: transformTime, store: storeTime };
+      
+      console.log(`📊 Email sync timing for user ${userId}:`, timing);
+
+      return { success: true, count: emailMetadata.length, timing };
     } catch (error) {
       console.error('Email sync error:', error);
       return { success: false, count: 0, error: error instanceof Error ? error.message : 'Unknown error' };

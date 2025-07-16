@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: finito_mail
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d finito_mail"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./apps/api
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/finito_mail
+      - NODE_ENV=development
+    depends_on:
+      db:
+        condition: service_healthy
+    command: npm run dev
+
+  web:
+    build: ./apps/web
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - NODE_ENV=development
+    depends_on:
+      - api
+    command: npm run dev
+
+  migrate:
+    build: ./apps/api
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/finito_mail
+      - NODE_ENV=development
+    depends_on:
+      db:
+        condition: service_healthy
+    command: node ../scripts/migrate.js
+    profiles:
+      - migration
+
+volumes:
+  postgres_data:

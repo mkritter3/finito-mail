@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
+    const state = searchParams.get('state');
     const error = searchParams.get('error');
 
     if (error) {
@@ -30,6 +31,24 @@ export async function GET(request: NextRequest) {
     if (!code) {
       return NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_WEB_URL}/auth?error=no_code`
+      );
+    }
+
+    if (!state) {
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_WEB_URL}/auth?error=no_state`
+      );
+    }
+
+    // Validate CSRF state parameter
+    const stateCookie = request.cookies.get('oauth_state');
+    if (!stateCookie || stateCookie.value !== state) {
+      console.error('OAuth CSRF validation failed:', {
+        cookieState: stateCookie?.value,
+        urlState: state,
+      });
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_WEB_URL}/auth?error=invalid_state`
       );
     }
 
@@ -100,10 +119,15 @@ export async function GET(request: NextRequest) {
         }
       );
 
-      // Redirect to web app with token
-      return NextResponse.redirect(
+      // Create redirect response
+      const response = NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_WEB_URL}/auth/callback?token=${jwtToken}`
       );
+
+      // Clear the OAuth state cookie after successful authentication
+      response.cookies.delete('oauth_state');
+
+      return response;
     } finally {
       await client.end();
     }

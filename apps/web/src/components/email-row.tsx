@@ -44,6 +44,7 @@ export function EmailRow({ email }: EmailRowProps) {
 
   return (
     <div
+      data-testid="email-row"
       className={cn(
         'email-row flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-border hover:bg-accent/50',
         !email.is_read && 'font-semibold'
