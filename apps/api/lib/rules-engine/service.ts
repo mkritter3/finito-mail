@@ -12,8 +12,22 @@ import {
   UpdateRuleRequest,
   RuleTestRequest,
   RuleTestResponse,
-  RuleStats
+  RuleStats,
+  RuleAction,
+  RuleActionRecord,
+  RuleHistory,
+  SECURITY_LIMITS
 } from './types'
+import { 
+  createRuleSchema, 
+  updateRuleSchema, 
+  validateRuleAgainstLimits,
+  validateExecutionRate,
+  validateForwardingRate,
+  validateReplyRate,
+  type CreateRuleBody,
+  type UpdateRuleBody
+} from './validation'
 
 export class RulesEngineService {
   private gmailClient: GmailClientEnhanced
@@ -25,7 +39,7 @@ export class RulesEngineService {
   }
 
   /**
-   * Process an email through all enabled rules for a user
+   * Process an email through all enabled rules for a user with security checks
    */
   async processEmail(
     userId: string,
@@ -35,6 +49,13 @@ export class RulesEngineService {
     const startTime = Date.now()
     
     try {
+      // Security: Check execution rate limits
+      const recentExecutions = await this.getRecentExecutions(userId, 60000) // 1 minute
+      const rateValidation = validateExecutionRate(recentExecutions, 60000)
+      if (!rateValidation.success) {
+        throw new Error('Rate limit exceeded: Too many rule executions')
+      }
+
       // Get all enabled rules for the user, ordered by priority
       const rules = await this.getUserRules(userId, true)
       
@@ -57,6 +78,38 @@ export class RulesEngineService {
         const matches = RuleEvaluator.evaluateConditions(rule.conditions, context)
         
         if (matches) {
+          // Security: Check for high-risk actions
+          const hasForwardAction = rule.actions.some(action => action.type === 'forward')
+          const hasReplyAction = rule.actions.some(action => action.type === 'reply')
+          
+          if (hasForwardAction) {
+            const recentForwards = await this.getRecentActionsByType(userId, 'forward', 3600000) // 1 hour
+            const forwardValidation = validateForwardingRate(recentForwards, 3600000)
+            if (!forwardValidation.success) {
+              await this.logRuleExecution(rule.id, userId, email.gmail_message_id, {
+                success: false,
+                errorMessage: 'Forward rate limit exceeded',
+                actionsExecuted: [],
+                executionTimeMs: Date.now() - startTime
+              })
+              continue
+            }
+          }
+          
+          if (hasReplyAction) {
+            const recentReplies = await this.getRecentActionsByType(userId, 'reply', 3600000) // 1 hour
+            const replyValidation = validateReplyRate(recentReplies, 3600000)
+            if (!replyValidation.success) {
+              await this.logRuleExecution(rule.id, userId, email.gmail_message_id, {
+                success: false,
+                errorMessage: 'Reply rate limit exceeded',
+                actionsExecuted: [],
+                executionTimeMs: Date.now() - startTime
+              })
+              continue
+            }
+          }
+
           // Execute rule actions
           const result = await this.executor.executeActions(rule.actions, context)
           
@@ -86,39 +139,110 @@ export class RulesEngineService {
   }
 
   /**
-   * Create a new rule
+   * Create a new rule with atomic transaction and comprehensive validation
    */
-  async createRule(userId: string, request: CreateRuleRequest): Promise<EmailRule> {
-    // Validate rule
-    const conditionValidation = RuleEvaluator.validateConditions(request.conditions)
-    if (!conditionValidation.valid) {
-      throw new Error(`Invalid conditions: ${conditionValidation.errors.join(', ')}`)
+  async createRule(userId: string, request: CreateRuleBody): Promise<EmailRule> {
+    // Validate request with Zod
+    const validatedRequest = createRuleSchema.parse(request)
+    
+    // Check user rule limits
+    const existingRules = await this.getUserRules(userId)
+    const limitValidation = validateRuleAgainstLimits(userId, existingRules)
+    if (!limitValidation.success) {
+      throw new Error(limitValidation.error.issues[0].message)
     }
 
-    const actionValidation = RuleEvaluator.validateActions(request.actions)
-    if (!actionValidation.valid) {
-      throw new Error(`Invalid actions: ${actionValidation.errors.join(', ')}`)
+    // Check for duplicate rule names
+    const duplicateCheck = await dbPool.query(
+      'SELECT id FROM email_rules_v2 WHERE user_id = $1 AND name = $2',
+      [userId, validatedRequest.name]
+    )
+    if (duplicateCheck.rows.length > 0) {
+      throw new Error('Rule name already exists')
     }
 
-    const query = `
-      INSERT INTO email_rules (
-        user_id, name, description, priority, enabled, conditions, actions
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *
-    `
+    // Begin atomic transaction
+    const client = await dbPool.connect()
+    try {
+      await client.query('BEGIN')
 
-    const values = [
-      userId,
-      request.name,
-      request.description || null,
-      request.priority || 0,
-      request.enabled !== false,
-      JSON.stringify(request.conditions),
-      JSON.stringify(request.actions)
-    ]
+      // Create the rule
+      const ruleQuery = `
+        INSERT INTO email_rules_v2 (
+          user_id, name, description, priority, enabled, conditions, system_type
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
+      `
 
-    const result = await dbPool.query(query, values)
-    return this.mapRuleFromDb(result.rows[0])
+      const ruleValues = [
+        userId,
+        validatedRequest.name,
+        validatedRequest.description || null,
+        validatedRequest.priority || 0,
+        validatedRequest.enabled !== false,
+        JSON.stringify(validatedRequest.conditions),
+        validatedRequest.system_type || null
+      ]
+
+      const ruleResult = await client.query(ruleQuery, ruleValues)
+      const rule = ruleResult.rows[0]
+
+      // Create rule actions
+      const actionPromises = validatedRequest.actions.map(async (action, index) => {
+        const actionQuery = `
+          INSERT INTO rule_actions (
+            rule_id, type, label_name, folder_name, forward_to_email, 
+            reply_subject, reply_body, execution_order
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          RETURNING *
+        `
+
+        const actionValues = [
+          rule.id,
+          action.type,
+          'label_name' in action ? action.label_name : null,
+          'folder_name' in action ? action.folder_name : null,
+          'forward_to_email' in action ? action.forward_to_email : null,
+          'reply_subject' in action ? action.reply_subject : null,
+          'reply_body' in action ? action.reply_body : null,
+          index
+        ]
+
+        return client.query(actionQuery, actionValues)
+      })
+
+      const actionResults = await Promise.all(actionPromises)
+
+      // Create rule history entry
+      const historyQuery = `
+        INSERT INTO rule_history (
+          rule_id, version, name, description, conditions, actions, 
+          trigger_type, changed_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `
+
+      await client.query(historyQuery, [
+        rule.id,
+        1, // First version
+        validatedRequest.name,
+        validatedRequest.description || null,
+        JSON.stringify(validatedRequest.conditions),
+        JSON.stringify(validatedRequest.actions),
+        'manual_creation',
+        userId
+      ])
+
+      await client.query('COMMIT')
+
+      // Map and return the complete rule
+      return this.mapRuleFromDb(rule, actionResults.map(r => r.rows[0]))
+
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
   }
 
   /**
@@ -207,22 +331,49 @@ export class RulesEngineService {
   }
 
   /**
-   * Get all rules for a user
+   * Get all rules for a user with actions
    */
   async getUserRules(userId: string, enabledOnly: boolean = false): Promise<EmailRule[]> {
-    let query = `
-      SELECT * FROM email_rules 
+    let ruleQuery = `
+      SELECT * FROM email_rules_v2 
       WHERE user_id = $1
     `
 
     if (enabledOnly) {
-      query += ` AND enabled = true`
+      ruleQuery += ` AND enabled = true`
     }
 
-    query += ` ORDER BY priority DESC, created_at ASC`
+    ruleQuery += ` ORDER BY priority DESC, created_at ASC`
 
-    const result = await dbPool.query(query, [userId])
-    return result.rows.map(row => this.mapRuleFromDb(row))
+    const ruleResult = await dbPool.query(ruleQuery, [userId])
+    
+    if (ruleResult.rows.length === 0) {
+      return []
+    }
+
+    // Get actions for all rules in one query
+    const ruleIds = ruleResult.rows.map(row => row.id)
+    const actionQuery = `
+      SELECT * FROM rule_actions 
+      WHERE rule_id = ANY($1::uuid[])
+      ORDER BY rule_id, execution_order ASC
+    `
+
+    const actionResult = await dbPool.query(actionQuery, [ruleIds])
+    
+    // Group actions by rule_id
+    const actionsByRuleId: { [key: string]: any[] } = {}
+    actionResult.rows.forEach(action => {
+      if (!actionsByRuleId[action.rule_id]) {
+        actionsByRuleId[action.rule_id] = []
+      }
+      actionsByRuleId[action.rule_id].push(action)
+    })
+
+    // Map rules with their actions
+    return ruleResult.rows.map(ruleRow => 
+      this.mapRuleFromDb(ruleRow, actionsByRuleId[ruleRow.id] || [])
+    )
   }
 
   /**
@@ -367,7 +518,7 @@ export class RulesEngineService {
    */
   private async updateRuleStats(ruleId: string): Promise<void> {
     const query = `
-      UPDATE email_rules 
+      UPDATE email_rules_v2 
       SET execution_count = execution_count + 1, last_executed_at = NOW()
       WHERE id = $1
     `
@@ -376,22 +527,98 @@ export class RulesEngineService {
   }
 
   /**
-   * Map database row to EmailRule
+   * Get recent executions for rate limiting
    */
-  private mapRuleFromDb(row: any): EmailRule {
+  private async getRecentExecutions(userId: string, timeWindowMs: number): Promise<RuleExecution[]> {
+    const query = `
+      SELECT * FROM rule_executions 
+      WHERE user_id = $1 AND created_at > NOW() - INTERVAL '${timeWindowMs / 1000} seconds'
+      ORDER BY created_at DESC
+    `
+
+    const result = await dbPool.query(query, [userId])
+    return result.rows.map(row => this.mapExecutionFromDb(row))
+  }
+
+  /**
+   * Get recent actions by type for rate limiting
+   */
+  private async getRecentActionsByType(userId: string, actionType: string, timeWindowMs: number): Promise<any[]> {
+    const query = `
+      SELECT re.*, ra.type as action_type
+      FROM rule_executions re
+      JOIN email_rules_v2 r ON re.rule_id = r.id
+      JOIN rule_actions ra ON r.id = ra.rule_id
+      WHERE re.user_id = $1 
+        AND ra.type = $2
+        AND re.created_at > NOW() - INTERVAL '${timeWindowMs / 1000} seconds'
+        AND re.success = true
+      ORDER BY re.created_at DESC
+    `
+
+    const result = await dbPool.query(query, [userId, actionType])
+    return result.rows
+  }
+
+  /**
+   * Map database row to EmailRule with hybrid architecture
+   */
+  private mapRuleFromDb(ruleRow: any, actionRows?: any[]): EmailRule {
+    // Convert action rows to RuleAction objects
+    const actions: RuleAction[] = actionRows ? actionRows.map(actionRow => {
+      const baseAction = { type: actionRow.type }
+      
+      switch (actionRow.type) {
+        case 'label':
+          return { ...baseAction, label_name: actionRow.label_name }
+        case 'move_to_folder':
+          return { ...baseAction, folder_name: actionRow.folder_name }
+        case 'forward':
+          return { ...baseAction, forward_to_email: actionRow.forward_to_email }
+        case 'reply':
+          return { 
+            ...baseAction, 
+            reply_subject: actionRow.reply_subject,
+            reply_body: actionRow.reply_body 
+          }
+        default:
+          return baseAction
+      }
+    }) : []
+
+    return {
+      id: ruleRow.id,
+      user_id: ruleRow.user_id,
+      name: ruleRow.name,
+      description: ruleRow.description,
+      priority: ruleRow.priority,
+      enabled: ruleRow.enabled,
+      conditions: JSON.parse(ruleRow.conditions),
+      actions,
+      execution_count: ruleRow.execution_count || 0,
+      last_executed_at: ruleRow.last_executed_at ? new Date(ruleRow.last_executed_at) : undefined,
+      system_type: ruleRow.system_type,
+      created_at: new Date(ruleRow.created_at),
+      updated_at: new Date(ruleRow.updated_at)
+    }
+  }
+
+  /**
+   * Map database row to RuleExecution
+   */
+  private mapExecutionFromDb(row: any): RuleExecution {
     return {
       id: row.id,
+      rule_id: row.rule_id,
       user_id: row.user_id,
-      name: row.name,
-      description: row.description,
-      priority: row.priority,
-      enabled: row.enabled,
-      conditions: JSON.parse(row.conditions),
-      actions: JSON.parse(row.actions),
-      execution_count: row.execution_count,
-      last_executed_at: row.last_executed_at ? new Date(row.last_executed_at) : undefined,
-      created_at: new Date(row.created_at),
-      updated_at: new Date(row.updated_at)
+      email_message_id: row.email_message_id,
+      email_thread_id: row.email_thread_id,
+      success: row.success,
+      error_message: row.error_message,
+      actions_taken: JSON.parse(row.actions_taken || '[]'),
+      execution_time_ms: row.execution_time_ms,
+      triggered_by: row.triggered_by,
+      created_at: new Date(row.created_at)
     }
   }
 

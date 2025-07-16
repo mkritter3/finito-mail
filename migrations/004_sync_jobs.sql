@@ -10,11 +10,13 @@ CREATE TABLE IF NOT EXISTS sync_jobs (
     started_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
     
-    -- Indexes
-    UNIQUE(user_id, created_at),
-    INDEX idx_sync_jobs_user_status ON sync_jobs(user_id, status),
-    INDEX idx_sync_jobs_created_at ON sync_jobs(created_at)
+    -- Unique constraint
+    UNIQUE(user_id, created_at)
 );
+
+-- Create indexes separately
+CREATE INDEX IF NOT EXISTS idx_sync_jobs_user_status ON sync_jobs(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_sync_jobs_created_at ON sync_jobs(created_at);
 
 -- Add comments
 COMMENT ON TABLE sync_jobs IS 'Tracks async email sync jobs and their status';
