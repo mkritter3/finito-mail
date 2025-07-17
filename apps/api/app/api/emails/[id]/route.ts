@@ -1,41 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GmailClientEnhanced } from '@finito/provider-client';
-import { Client } from 'pg';
 import { verify } from 'jsonwebtoken';
-import * as DOMPurify from 'dompurify';
-import { JSDOM } from 'jsdom';
+import { IntelligentContentFetcher } from '../../../lib/intelligent-content-fetcher';
 import { emailCache } from '@/lib/email-cache';
 
-const dbClient = new Client({
-  connectionString: process.env.DATABASE_URL!,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
-
-const gmailClient = new GmailClientEnhanced({
-  clientId: process.env.GOOGLE_CLIENT_ID!,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-});
-
-// Initialize DOMPurify with JSDOM for server-side sanitization
-const window = new JSDOM('').window;
-const purify = DOMPurify(window as any);
-
-// Configure DOMPurify for safe email content
-const sanitizeConfig = {
-  ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'span', 'div', 'p', 'br', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'td', 'th'],
-  ALLOWED_ATTR: ['href', 'title', 'style', 'class', 'id'],
-  ALLOWED_URI_REGEXP: /^https?:\/\//,
-  FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'textarea', 'button'],
-  FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover', 'onmouseout', 'onfocus', 'onblur'],
-};
+// Initialize intelligent content fetcher
+const contentFetcher = new IntelligentContentFetcher();
 
 /**
- * GET /api/emails/[id] - Get full email content
+ * GET /api/emails/[id] - Get full email content with metadata-first approach
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const startTime = Date.now();
+
   try {
     // Get user from JWT token
     const authHeader = request.headers.get('Authorization');
@@ -47,107 +26,114 @@ export async function GET(
     const decoded = verify(token, process.env.NEXTAUTH_SECRET!) as any;
     const userId = decoded.sub;
 
-    // Check cache first
+    // Check legacy cache first (for backward compatibility)
     const cachedEmail = await emailCache.getCachedEmailDetails(params.id);
     if (cachedEmail) {
-      return NextResponse.json({ ...cachedEmail, cached: true });
+      console.log(`📋 Legacy cache hit for message ${params.id}`);
+      return NextResponse.json({ 
+        ...cachedEmail, 
+        cached: true,
+        cacheType: 'legacy',
+        fetchTime: Date.now() - startTime
+      });
     }
 
-    await dbClient.connect();
-
-    // Get user's Google tokens
-    const tokenResult = await dbClient.query(
-      'SELECT access_token, refresh_token, expires_at FROM google_auth_tokens WHERE user_id = $1',
-      [userId]
-    );
-
-    if (tokenResult.rows.length === 0) {
-      return NextResponse.json({ error: 'No Google tokens found' }, { status: 401 });
-    }
-
-    const tokens = tokenResult.rows[0];
-    const expiresAt = Math.floor(new Date(tokens.expires_at).getTime() / 1000);
-
-    // Get Gmail client with token refresh
-    const client = await gmailClient.getGmailClientWithRefresh({
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      expiresAt,
-      emailAccountId: userId,
+    // Use intelligent content fetcher with metadata-first approach
+    const content = await contentFetcher.fetchEmailContent({
+      userId,
+      messageId: params.id,
+      strategy: 'immediate',
+      reason: 'user_viewing',
+      priority: 'high'
     });
 
-    // Fetch full email content from Gmail
-    const message = await gmailClient.getMessage(client, params.id, 'full');
-    
-    // Extract email data
-    const headers = message.payload?.headers || [];
-    const getHeader = (name: string) => 
-      headers.find(h => h.name === name)?.value || '';
+    // Get metadata from enhanced table for additional context
+    const metadata = await getEmailMetadata(userId, params.id);
 
-    // Get email body
-    const getBody = (payload: any): { html: string; text: string } => {
-      let html = '';
-      let text = '';
-      
-      if (payload.body?.data) {
-        const body = Buffer.from(payload.body.data, 'base64').toString('utf-8');
-        if (payload.mimeType === 'text/html') {
-          html = body;
-        } else {
-          text = body;
-        }
-      }
-      
-      if (payload.parts) {
-        for (const part of payload.parts) {
-          if (part.mimeType === 'text/html' && part.body?.data) {
-            html = Buffer.from(part.body.data, 'base64').toString('utf-8');
-          } else if (part.mimeType === 'text/plain' && part.body?.data) {
-            text = Buffer.from(part.body.data, 'base64').toString('utf-8');
-          }
-          
-          // Recursively search nested parts
-          const nestedBody = getBody(part);
-          if (nestedBody.html) html = nestedBody.html;
-          if (nestedBody.text) text = nestedBody.text;
-        }
-      }
-      
-      return { html, text };
-    };
-
-    const body = getBody(message.payload);
-
-    // Sanitize HTML content for security
-    const sanitizedHtml = body.html ? purify.sanitize(body.html, sanitizeConfig) : '';
-
+    // Combine content with metadata
     const emailData = {
-      id: message.id,
-      threadId: message.threadId,
-      subject: getHeader('Subject'),
-      from: getHeader('From'),
-      to: getHeader('To'),
-      cc: getHeader('Cc'),
-      bcc: getHeader('Bcc'),
-      date: getHeader('Date'),
-      htmlBody: sanitizedHtml,
-      textBody: body.text,
-      snippet: message.snippet,
-      labelIds: message.labelIds || [],
-      cached: false
+      id: content.id,
+      threadId: metadata?.gmail_thread_id || '',
+      subject: metadata?.subject || '',
+      from: metadata?.from_address ? 
+        `${metadata.from_address.name} <${metadata.from_address.email}>` : '',
+      to: metadata?.to_addresses?.map((addr: any) => 
+        `${addr.name} <${addr.email}>`).join(', ') || '',
+      cc: metadata?.cc_addresses?.map((addr: any) => 
+        `${addr.name} <${addr.email}>`).join(', ') || '',
+      bcc: '',
+      date: metadata?.received_at || '',
+      htmlBody: content.sanitizedHtml,
+      textBody: content.textBody,
+      snippet: metadata?.snippet || '',
+      labelIds: [],
+      
+      // Enhanced metadata-first data
+      cached: content.cached,
+      cacheType: content.cached ? 'intelligent' : 'fresh',
+      fetchTime: content.fetchTime,
+      contentSize: content.contentSize,
+      cacheExpires: content.cacheExpires,
+      
+      // Pattern analysis data (if available)
+      senderPatternScore: metadata?.sender_pattern_score || 0,
+      newsletterPatternScore: metadata?.newsletter_pattern_score || 0,
+      isNewsletter: metadata?.is_newsletter || false,
+      domainFrom: metadata?.domain_from || null
     };
-
-    // Cache the email details
-    await emailCache.cacheEmailDetails(params.id, emailData);
 
     return NextResponse.json(emailData);
   } catch (error) {
-    console.error('Error fetching email:', error);
+    console.error('Error fetching email with metadata-first approach:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch email' },
+      { 
+        error: 'Failed to fetch email',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        fetchTime: Date.now() - startTime
+      },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Get email metadata from enhanced table
+ */
+async function getEmailMetadata(userId: string, messageId: string) {
+  const { Client } = require('pg');
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL!,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  });
+
+  try {
+    await client.connect();
+    
+    // Try enhanced table first, fallback to original
+    let result = await client.query(`
+      SELECT * FROM email_metadata_enhanced 
+      WHERE user_id = $1 AND gmail_message_id = $2
+    `, [userId, messageId]);
+
+    if (result.rows.length === 0) {
+      // Fallback to original table
+      result = await client.query(`
+        SELECT 
+          user_id, gmail_message_id, gmail_thread_id, subject, snippet,
+          from_address, to_addresses, received_at, is_read,
+          NULL as domain_from, FALSE as is_newsletter, 
+          FALSE as has_list_unsubscribe, 0 as sender_pattern_score,
+          0 as newsletter_pattern_score, NULL as cc_addresses
+        FROM email_metadata 
+        WHERE user_id = $1 AND gmail_message_id = $2
+      `, [userId, messageId]);
+    }
+
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error fetching email metadata:', error);
+    return null;
   } finally {
-    await dbClient.end();
+    await client.end();
   }
 }
