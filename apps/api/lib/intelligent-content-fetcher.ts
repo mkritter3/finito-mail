@@ -1,4 +1,4 @@
-import { GmailClientEnhanced } from '@finito/provider-client';
+import { GmailClientEnhanced, createResilientGmailClient } from '@finito/provider-client';
 import { dbPool } from './db-pool';
 import * as DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
@@ -146,8 +146,18 @@ export class IntelligentContentFetcher {
         emailAccountId: request.userId,
       });
 
-      // Fetch full message
-      const message = await this.gmailClient.getMessage(gmailClient, request.messageId, 'full');
+      // Create resilient client for this operation
+      const resilientClient = createResilientGmailClient(tokens.access_token, {
+        concurrency: 2, // Conservative concurrency for content fetching
+        intervalCap: 8, // 8 requests per second max
+        interval: 1000,
+        circuitBreakerTimeout: 15000, // 15s timeout for content fetching
+        errorThreshold: 40, // Trip at 40% error rate (more sensitive)
+        resetTimeout: 60000, // 60s reset timeout
+      });
+
+      // Fetch full message with resilience protection
+      const message = await resilientClient.getMessage(request.messageId);
       
       // Extract content
       const { html, text } = this.extractEmailBody(message.payload);
@@ -353,7 +363,7 @@ export class IntelligentContentFetcher {
           LIMIT 5
         `, [userId, messageId]);
 
-        // Prefetch in background
+        // Prefetch in background with concurrency control
         const prefetchPromises = result.rows.map(row => 
           this.fetchEmailContent({
             userId,
@@ -366,7 +376,7 @@ export class IntelligentContentFetcher {
           })
         );
 
-        // Don't await - run in background
+        // Don't await - run in background with controlled concurrency
         Promise.allSettled(prefetchPromises);
       } finally {
         client.release();

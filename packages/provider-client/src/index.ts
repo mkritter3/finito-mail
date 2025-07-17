@@ -1,6 +1,7 @@
 export * from './gmail/gmail-client';
 export * from './gmail/gmail-client-enhanced';
 export * from './gmail/retry';
+export * from './gmail/resilient-client';
 export * from './outlook/outlook-client';
 export * from './auth/pkce';
 export * from './auth/token-manager';

@@ -77,8 +77,14 @@ export async function batchGetMessages(
         throw new Error('Invalid access token');
       }
       if (response.status === 429) {
-        // Rate limited, retry with exponential backoff
-        await sleep(RATE_LIMIT.RETRY_DELAY * Math.pow(2, retryCount));
+        // Rate limited, respect server Retry-After header or use exponential backoff
+        const retryAfterHeader = response.headers.get('Retry-After');
+        const retryAfterSeconds = retryAfterHeader ? 
+          parseInt(retryAfterHeader, 10) : 
+          (RATE_LIMIT.RETRY_DELAY * Math.pow(2, retryCount)) / 1000;
+        
+        console.log(`[Gmail API] Rate limited, waiting ${retryAfterSeconds}s (${retryAfterHeader ? 'server-specified' : 'exponential backoff'})`);
+        await sleep(retryAfterSeconds * 1000);
         return batchGetMessages(messageIds, accessToken, retryCount + 1);
       }
       throw new Error(`Batch request failed: ${response.status}`);
