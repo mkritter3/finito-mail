@@ -28,8 +28,14 @@ generation_timestamp: '2025-07-15T03:09:38.161Z'
 # Access MCP functionality via Zen tools (CURRENT METHOD)
 claude "Use zen tools to access MCP capabilities"
 
-# Multi-AI collaboration
+# Multi-AI collaboration for production architecture
 claude "Use zen chat with gemini-2.5-pro model for strategic analysis. use context7"
+
+# Production infrastructure review
+claude "Use zen thinkdeep to analyze production readiness and infrastructure. use context7"
+
+# Code review with security focus  
+claude "Use zen codereview to analyze security and performance patterns. use context7"
 ```
 
 ## 🛠️ Available MCP Tools via Zen
