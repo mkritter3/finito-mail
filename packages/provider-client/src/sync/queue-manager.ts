@@ -26,10 +26,7 @@ export class QueueManager {
   private queue: PQueue;
   private stats: QueueStats = { pending: 0, running: 0, completed: 0, failed: 0 };
   private jobHandlers: Map<string, (job: SyncJob) => Promise<SyncResult>> = new Map();
-  private config: QueueConfig;
-
   constructor(config: QueueConfig) {
-    this.config = config;
     this.queue = new PQueue({
       concurrency: config.concurrency,
       timeout: config.timeout,
@@ -115,7 +112,7 @@ export class QueueManager {
   getSize(): { pending: number; running: number } {
     return {
       pending: this.queue.pending,
-      running: this.queue.running,
+      running: this.queue.size,
     };
   }
 
@@ -156,19 +153,19 @@ export class QueueManager {
    */
   private setupEventHandlers(): void {
     this.queue.on('add', () => {
-      logger.debug('Job added to queue');
+      logger.info('Job added to queue');
     });
 
     this.queue.on('next', () => {
-      logger.debug('Processing next job');
+      logger.info('Processing next job');
     });
 
     this.queue.on('active', () => {
-      logger.debug('Job became active');
+      logger.info('Job became active');
     });
 
     this.queue.on('completed', (result) => {
-      logger.debug('Job completed', { result });
+      logger.info('Job completed', { result });
     });
 
     this.queue.on('error', (error) => {

@@ -27,11 +27,11 @@ export function useFullEmail(emailId: string): UseFullEmailResult {
   const [email, setEmail] = useState<FullEmail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { token } = useAuth();
-  const { getCachedEmail, prefetchEmail, isCached } = useEmailPrefetch();
+  const { getAccessToken } = useAuth();
+  const { getCachedEmail } = useEmailPrefetch();
 
   useEffect(() => {
-    if (!emailId || !token) return;
+    if (!emailId) return;
 
     const fetchEmail = async () => {
       // Check cache first
@@ -47,6 +47,11 @@ export function useFullEmail(emailId: string): UseFullEmailResult {
       setError(null);
 
       try {
+        const token = await getAccessToken();
+        if (!token) {
+          throw new Error('Authentication token not available.');
+        }
+
         const response = await fetch(`/api/emails/${emailId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -67,7 +72,7 @@ export function useFullEmail(emailId: string): UseFullEmailResult {
     };
 
     fetchEmail();
-  }, [emailId, token, getCachedEmail]);
+  }, [emailId, getAccessToken, getCachedEmail]);
 
   return { email, loading, error };
 }

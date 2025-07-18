@@ -1,0 +1,108 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+# Fill these in with your specific AWS details
+env:
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECS_CLUSTER: finito-cluster
+  # These are placeholders for the network config of the migration task
+  ECS_MIGRATE_SUBNETS: ${{ secrets.ECS_MIGRATE_SUBNETS }}
+  ECS_MIGRATE_SECURITY_GROUP: ${{ secrets.ECS_MIGRATE_SECURITY_GROUP }}
+
+jobs:
+  filter-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+      migrate: ${{ steps.filter.outputs.migrate }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'apps/api/**'
+              - 'packages/**'
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+            migrate:
+              - 'apps/migrate/**'
+              - 'scripts/migrate.js'
+              - 'migrations/**'
+
+  build-and-push:
+    needs: filter-changes
+    if: needs.filter-changes.outputs.api == 'true' || needs.filter-changes.outputs.web == 'true' || needs.filter-changes.outputs.migrate == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubAction-ECR-Role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push API image
+        if: needs.filter-changes.outputs.api == 'true'
+        run: |
+          docker build . -f apps/api/Dockerfile.prod --target production -t ${{ env.ECR_REGISTRY }}/finito-api:${{ github.sha }} -t ${{ env.ECR_REGISTRY }}/finito-api:latest
+          docker push ${{ env.ECR_REGISTRY }}/finito-api --all-tags
+
+      - name: Build and push Web image
+        if: needs.filter-changes.outputs.web == 'true'
+        run: |
+          docker build . -f apps/web/Dockerfile.prod --target production -t ${{ env.ECR_REGISTRY }}/finito-web:${{ github.sha }} -t ${{ env.ECR_REGISTRY }}/finito-web:latest
+          docker push ${{ env.ECR_REGISTRY }}/finito-web --all-tags
+      
+      - name: Build and push Migrate image
+        if: needs.filter-changes.outputs.migrate == 'true'
+        run: |
+          docker build . -f apps/migrate/Dockerfile --target production -t ${{ env.ECR_REGISTRY }}/finito-migrate:${{ github.sha }} -t ${{ env.ECR_REGISTRY }}/finito-migrate:latest
+          docker push ${{ env.ECR_REGISTRY }}/finito-migrate --all-tags
+
+  deploy:
+    needs: [filter-changes, build-and-push]
+    if: needs.build-and-push.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubAction-ECS-Deploy-Role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: CRITICAL - Run Database Migrations
+        run: |
+          aws ecs run-task \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --task-definition finito-migrate \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ env.ECS_MIGRATE_SUBNETS }}],securityGroups=[${{ env.ECS_MIGRATE_SECURITY_GROUP }}]}" \
+            --wait tasks-stopped
+
+      - name: Deploy API Service
+        if: needs.filter-changes.outputs.api == 'true'
+        run: aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service finito-api-service --force-new-deployment --no-cli-pager
+
+      - name: Deploy Web Service
+        if: needs.filter-changes.outputs.web == 'true'
+        run: aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service finito-web-service --force-new-deployment --no-cli-pager

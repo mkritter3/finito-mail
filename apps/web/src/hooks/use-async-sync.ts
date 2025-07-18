@@ -30,9 +30,10 @@ export function useAsyncSync(): UseAsyncSyncResult {
   const [currentSync, setCurrentSync] = useState<SyncJob | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { token } = useAuth();
+  const { getAccessToken } = useAuth();
 
   const getSyncStatus = useCallback(async (jobId?: string): Promise<SyncJob | null> => {
+    const token = await getAccessToken();
     if (!token) return null;
 
     try {
@@ -56,9 +57,10 @@ export function useAsyncSync(): UseAsyncSyncResult {
       console.error('Error getting sync status:', err);
       return null;
     }
-  }, [token]);
+  }, [getAccessToken]);
 
   const startSync = useCallback(async () => {
+    const token = await getAccessToken();
     if (!token) return;
 
     setIsLoading(true);
@@ -104,12 +106,11 @@ export function useAsyncSync(): UseAsyncSyncResult {
     } finally {
       setIsLoading(false);
     }
-  }, [token, getSyncStatus]);
+  }, [getAccessToken, getSyncStatus]);
 
   // Poll for latest sync status on mount
   useEffect(() => {
-    if (token) {
-      getSyncStatus().then(syncJob => {
+    getSyncStatus().then(syncJob => {
         if (syncJob) {
           setCurrentSync(syncJob);
           
@@ -130,8 +131,7 @@ export function useAsyncSync(): UseAsyncSyncResult {
           }
         }
       });
-    }
-  }, [token, getSyncStatus]);
+  }, [getAccessToken, getSyncStatus]);
 
   return {
     currentSync,

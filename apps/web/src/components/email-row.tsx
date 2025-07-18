@@ -1,7 +1,6 @@
 'use client'
 
-import { cn } from '@finito/ui'
-import { Checkbox } from '@finito/ui/checkbox'
+import { cn, Checkbox } from '@finito/ui'
 import { useEmailPrefetch } from '@/hooks/use-email-prefetch'
 import { useEmailStore } from '@/stores/email-store'
 
@@ -69,7 +68,7 @@ export function EmailRow({ email }: EmailRowProps) {
     setSelectedEmailId(email.gmail_message_id)
   }
 
-  const handleCheckboxChange = (checked: boolean) => {
+  const handleCheckboxChange = () => {
     toggleEmailSelection(email.gmail_message_id)
   }
 
@@ -79,9 +78,7 @@ export function EmailRow({ email }: EmailRowProps) {
       className={cn(
         'email-row group flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-border hover:bg-accent/50 transition-colors',
         !displayEmail.is_read && 'font-semibold',
-        isSelected && 'bg-blue-50 border-blue-200',
-        displayEmail.deleted && 'opacity-50 line-through',
-        displayEmail.archived && 'opacity-75'
+        isSelected && 'bg-blue-50 border-blue-200'
       )}
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}

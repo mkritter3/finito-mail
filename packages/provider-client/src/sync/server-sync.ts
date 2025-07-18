@@ -1,6 +1,5 @@
 import { createScopedLogger } from '../utils/logger';
 import { GmailClientEnhanced } from '../gmail/gmail-client-enhanced';
-import { withGmailRetry } from '../gmail/retry';
 import type { EmailMetadata, OutboxEntry } from '@finito/storage';
 
 const logger = createScopedLogger('server-sync');
@@ -224,6 +223,10 @@ export class ServerSyncService {
 
     try {
       // Get history since last sync
+      if (!job.parameters.start_history_id) {
+        throw new Error('start_history_id is required for history sync');
+      }
+      
       const history = await gmailClient.getHistory(
         client,
         job.parameters.start_history_id,
@@ -239,22 +242,22 @@ export class ServerSyncService {
       
       for (const historyItem of history.history) {
         if (historyItem.messagesAdded) {
-          historyItem.messagesAdded.forEach(item => 
+          historyItem.messagesAdded.forEach((item: any) => 
             changedMessageIds.add(item.message.id)
           );
         }
         if (historyItem.messagesDeleted) {
-          historyItem.messagesDeleted.forEach(item => 
+          historyItem.messagesDeleted.forEach((item: any) => 
             changedMessageIds.add(item.message.id)
           );
         }
         if (historyItem.labelsAdded) {
-          historyItem.labelsAdded.forEach(item => 
+          historyItem.labelsAdded.forEach((item: any) => 
             changedMessageIds.add(item.message.id)
           );
         }
         if (historyItem.labelsRemoved) {
-          historyItem.labelsRemoved.forEach(item => 
+          historyItem.labelsRemoved.forEach((item: any) => 
             changedMessageIds.add(item.message.id)
           );
         }
@@ -298,7 +301,7 @@ export class ServerSyncService {
     };
 
     try {
-      const outboxEntries: OutboxEntry[] = job.parameters.outbox_entries;
+      const outboxEntries: OutboxEntry[] = job.parameters.outbox_entries || [];
       
       for (const entry of outboxEntries) {
         try {

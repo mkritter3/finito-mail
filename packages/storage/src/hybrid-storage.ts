@@ -357,7 +357,10 @@ export class HybridEmailStorage {
         isDraft: false, // TODO: Implement draft detection
         labels: meta.labels,
         folder: this.inferFolderFromLabels(meta.labels),
-        attachments: body?.attachments || [],
+        attachments: (body?.attachments || []).map(att => ({
+          ...att,
+          emailId: meta.id
+        })),
       } as Email;
     });
   }

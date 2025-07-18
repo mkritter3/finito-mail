@@ -1,7 +1,7 @@
 import { auth, gmail, type gmail_v1 } from '@googleapis/gmail';
 import { people } from '@googleapis/people';
 import { tokenManager } from '../auth/token-manager';
-import type { Email, EmailAddress, Attachment } from '@finito/types';
+// import type { Email, EmailAddress, Attachment } from '@finito/types';
 import { GMAIL_SCOPES } from './scopes';
 import { withGmailRetry } from './retry';
 import { createScopedLogger } from '../utils/logger';
@@ -26,7 +26,7 @@ interface TokenSaveOptions {
 }
 
 export class GmailClientEnhanced {
-  private readonly baseUrl = 'https://gmail.googleapis.com/gmail/v1';
+  // private readonly baseUrl = 'https://gmail.googleapis.com/gmail/v1';
   private readonly provider = 'gmail';
   private clientId: string;
   private clientSecret: string;
@@ -101,7 +101,7 @@ export class GmailClientEnhanced {
    */
   getContactsClient({ accessToken, refreshToken }: AuthOptions) {
     const auth = this.getAuth({ accessToken, refreshToken });
-    const contacts = people({ version: 'v1', auth });
+    const contacts = people({ version: 'v1', auth } as any);
     return contacts;
   }
 
@@ -131,8 +131,11 @@ export class GmailClientEnhanced {
       });
 
       return {
-        messages: response.data.messages || [],
-        nextPageToken: response.data.nextPageToken,
+        messages: (response.data.messages || []).map(msg => ({
+          id: msg.id || '',
+          threadId: msg.threadId || '',
+        })),
+        nextPageToken: response.data.nextPageToken || undefined,
         resultSizeEstimate: response.data.resultSizeEstimate || 0,
       };
     });
@@ -165,15 +168,11 @@ export class GmailClientEnhanced {
     ids: string[]
   ): Promise<gmail_v1.Schema$Message[]> {
     return withGmailRetry(async () => {
-      const batch = client.users.messages.batch;
-      const requests = ids.map(id => ({
-        userId: 'me',
-        id,
-        format: 'full' as const,
-      }));
-
-      const response = await batch({ requests });
-      return response.data.responses || [];
+      // Gmail API doesn't have a batch method, so we'll fetch them individually
+      const messages = await Promise.all(
+        ids.map(id => this.getMessage(client, id))
+      );
+      return messages;
     });
   }
 
@@ -288,7 +287,7 @@ export class GmailClientEnhanced {
 
       return {
         history: response.data.history || [],
-        nextPageToken: response.data.nextPageToken,
+        nextPageToken: response.data.nextPageToken || undefined,
         historyId: response.data.historyId!,
       };
     });
@@ -337,11 +336,11 @@ export class GmailClientEnhanced {
   }: TokenSaveOptions): Promise<void> {
     // Save tokens using our token manager
     await tokenManager.storeTokens(this.provider, {
-      accessToken: tokens.access_token || null,
+      accessToken: tokens.access_token || '',
       refreshToken: accountRefreshToken,
       expiresIn: tokens.expires_at
         ? Math.floor(tokens.expires_at - Date.now() / 1000)
-        : null,
+        : 0,
     });
 
     logger.info('Tokens saved successfully', { emailAccountId });

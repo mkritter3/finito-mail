@@ -22,7 +22,7 @@ const MAX_CACHE_SIZE = 50; // Maximum number of cached emails
 let emailCache: Map<string, CachedEmail> = new Map();
 
 export function useEmailPrefetch(): UseEmailPrefetchResult {
-  const { token } = useAuth();
+  const { getAccessToken } = useAuth();
   const [, forceUpdate] = useState({});
 
   // Force component re-render when cache changes
@@ -31,6 +31,7 @@ export function useEmailPrefetch(): UseEmailPrefetchResult {
   }, []);
 
   const prefetchEmail = useCallback(async (emailId: string) => {
+    const token = await getAccessToken();
     if (!token || !emailId) return;
 
     // Check if already cached and not expired
@@ -99,7 +100,7 @@ export function useEmailPrefetch(): UseEmailPrefetchResult {
       emailCache.delete(emailId);
       triggerUpdate();
     }
-  }, [token, triggerUpdate]);
+  }, [getAccessToken, triggerUpdate]);
 
   const getCachedEmail = useCallback((emailId: string) => {
     const cached = emailCache.get(emailId);

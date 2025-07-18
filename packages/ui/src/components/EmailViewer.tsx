@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from './button';
 import { Badge } from './badge';
 import { Separator } from './separator';

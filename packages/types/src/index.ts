@@ -89,6 +89,7 @@ export interface SearchFilters {
   to?: string;
   subject?: string;
   body?: string;
+  text?: string;
   hasAttachment?: boolean;
   isRead?: boolean;
   isStarred?: boolean;

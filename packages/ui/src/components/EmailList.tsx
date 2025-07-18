@@ -1,8 +1,7 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Button } from './button';
 import { Checkbox } from './checkbox';
 import { Badge } from './badge';
-import { Separator } from './separator';
 import { cn } from '../lib/utils';
 import type { Email, EmailFolder } from '@finito/types';
 

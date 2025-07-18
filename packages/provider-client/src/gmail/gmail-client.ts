@@ -4,10 +4,7 @@ import type { Email, EmailAddress, Attachment } from '@finito/types';
 import { GMAIL_SCOPES_STRING } from './scopes';
 import { 
   batchGetMessages, 
-  getMessagesWithPagination, 
-  extractBody,
-  decodeBase64Url,
-  type GmailListOptions 
+  extractBody
 } from './api-utils';
 
 // Gmail OAuth configuration

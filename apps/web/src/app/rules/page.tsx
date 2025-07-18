@@ -49,11 +49,12 @@ interface RulesStats {
   }>
 }
 
-function SortableRuleCard({ rule, onToggle, onEdit, onDelete }: {
+function SortableRuleCard({ rule, onToggle, onEdit, onDelete, isUpdating }: {
   rule: EmailRule
   onToggle: (id: string, enabled: boolean) => void
   onEdit: (rule: EmailRule) => void
   onDelete: (id: string) => void
+  isUpdating?: boolean
 }) {
   const {
     attributes,
@@ -170,6 +171,7 @@ function SortableRuleCard({ rule, onToggle, onEdit, onDelete }: {
               <Switch
                 checked={rule.enabled}
                 onCheckedChange={(checked) => onToggle(rule.id, checked)}
+                disabled={isUpdating}
               />
               <Button
                 variant="ghost"
@@ -482,6 +484,7 @@ export default function RulesPage() {
                     onToggle={handleToggleRule}
                     onEdit={handleEditRule}
                     onDelete={handleDeleteRule}
+                    isUpdating={updating.has(rule.id)}
                   />
                 ))}
               </div>

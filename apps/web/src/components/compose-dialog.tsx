@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Send, Paperclip, Image, Link, Smile, MoreVertical } from 'lucide-react'
 import { Button } from '@finito/ui'
 // import { useEmailStore } from '@/stores/email-store'
-import { useAuth } from '@/hooks/use-auth'
-import { gmailClient } from '@finito/provider-client'
+// import { useAuth } from '@/hooks/use-auth'
+import { sendEmail } from '@/app/actions/email-sync'
 import type { EmailAddress } from '@finito/types'
 
 interface ComposeDialogProps {
@@ -29,7 +29,7 @@ export function ComposeDialog({
   replyTo,
   mode = 'compose' 
 }: ComposeDialogProps) {
-  const { getAccessToken } = useAuth()
+  // const { } = useAuth()
   const [to, setTo] = useState('')
   const [cc, setCc] = useState('')
   const [bcc, setBcc] = useState('')
@@ -88,38 +88,29 @@ export function ComposeDialog({
   }
 
   const handleSend = async () => {
-    if (!gmailClient || !to || !subject) return
+    if (!to || !subject) return
 
     try {
       setIsSending(true)
       
-      // Get fresh access token
-      const token = await getAccessToken()
-      if (!token) throw new Error('No access token')
-
-      // Build email message
-      const messageParts = [
-        `To: ${to}`,
-        cc ? `Cc: ${cc}` : '',
-        bcc ? `Bcc: ${bcc}` : '',
-        `Subject: ${subject}`,
-        'Content-Type: text/plain; charset=utf-8',
-        '',
-        body
-      ].filter(Boolean).join('\n')
-
-      const encodedMessage = btoa(messageParts).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-
-      // Send email
-      await gmailClient.sendEmail({
-        raw: encodedMessage,
+      // Use Server Action to send email
+      const result = await sendEmail({
+        to,
+        cc: cc || undefined,
+        bcc: bcc || undefined,
+        subject,
+        body,
         threadId: mode !== 'compose' ? replyTo?.threadId : undefined
       })
 
-      // Close dialog and show success
-      onClose()
-      // In a real app, show a success toast
-      console.log('Email sent successfully')
+      if (result.data?.success) {
+        // Close dialog and show success
+        onClose()
+        console.log('Email sent successfully', { messageId: result.data.messageId, threadId: result.data.threadId })
+      } else {
+        console.error('Failed to send email:', result.error)
+        // In a real app, show an error toast
+      }
 
     } catch (error) {
       console.error('Failed to send email:', error)

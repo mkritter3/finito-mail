@@ -29,6 +29,8 @@
   "devDependencies": {
     "@playwright/test": "^1.54.1",
     "@types/node": "^20.11.0",
+    "@types/opossum": "^8.1.9",
+    "@types/pino": "^7.0.4",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
     "eslint": "^8.56.0",
@@ -41,6 +43,8 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "opossum": "^9.0.0"
+    "opossum": "^9.0.0",
+    "pino": "^9.7.0",
+    "zod": "^4.0.5"
   }
 }

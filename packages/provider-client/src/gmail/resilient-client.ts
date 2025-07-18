@@ -107,7 +107,7 @@ export class ResilientGmailClient {
       return this.circuitBreaker.fire(async () => {
         return batchGetMessages(messageIds, this.accessToken);
       });
-    });
+    }) as Promise<GmailMessage[]>;
   }
 
   /**
@@ -121,7 +121,7 @@ export class ResilientGmailClient {
       return this.circuitBreaker.fire(async () => {
         return listMessages(options, this.accessToken);
       });
-    });
+    }) as Promise<{ messages: Array<{ id: string; threadId: string }>, nextPageToken?: string }>;
   }
 
   /**
@@ -221,7 +221,14 @@ export class ResilientGmailClient {
  */
 export function createResilientGmailClient(
   accessToken: string, 
-  options?: Parameters<typeof ResilientGmailClient.prototype.constructor>[1]
+  options?: {
+    concurrency?: number;
+    intervalCap?: number;
+    interval?: number;
+    circuitBreakerTimeout?: number;
+    errorThreshold?: number;
+    resetTimeout?: number;
+  }
 ): ResilientGmailClient {
   return new ResilientGmailClient(accessToken, options);
 }

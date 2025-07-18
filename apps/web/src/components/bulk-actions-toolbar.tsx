@@ -1,9 +1,7 @@
 'use client'
 
-import { Button } from '@finito/ui/button'
-import { Separator } from '@finito/ui/separator'
-import { Badge } from '@finito/ui/badge'
-import { X, Mail, MailOpen, Archive, Trash2, Tag, Loader2 } from 'lucide-react'
+import { Button, Separator, Badge } from '@finito/ui'
+import { X, Mail, MailOpen, Archive, Trash2, Loader2 } from 'lucide-react'
 import { useBulkActions } from '@/hooks/use-bulk-actions'
 import { useEmailStore } from '@/stores/email-store'
 

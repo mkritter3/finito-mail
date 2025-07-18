@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { emailSync } from '@finito/provider-client'
+import { syncRecentEmails } from '@/app/actions/email-sync'
 import { RefreshCw } from 'lucide-react'
 
 export function Header() {
@@ -25,8 +25,12 @@ export function Header() {
     if (!isSyncing) {
       setIsSyncing(true)
       try {
-        await emailSync.syncRecentEmails(5)
-        setLastSyncTime(new Date())
+        const result = await syncRecentEmails(5)
+        if (result.data?.success) {
+          setLastSyncTime(new Date())
+        } else {
+          console.error('Sync failed:', result.error)
+        }
       } catch (error) {
         console.error('Sync failed:', error)
       } finally {
