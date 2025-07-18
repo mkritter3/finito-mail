@@ -570,7 +570,7 @@ Create an issue or start a discussion in our engineering channels!
 
 ### 🚂 Railway Deployment Process: The Complete Flow
 
-**Our Deployment Model:** Railway uses a **"pull"** model - it monitors our GitHub repository and automatically deploys when it detects changes to the `main` branch.
+**Our Deployment Model:** Railway uses a **"pull"** model - it monitors our GitHub repository and automatically detects new commits on the `main` branch.
 
 ```mermaid
 sequenceDiagram
@@ -585,8 +585,9 @@ sequenceDiagram
     GHA->>GHA: Run quality checks
     GHA->>GHA: Run tests
     GHA->>GHA: Build verification
-    GHA->>GH: ✅ All checks pass
-    GH->>Railway: Webhook: New commit detected
+    GHA->>GH: ✅ All checks pass (PR can be merged)
+    Note over GH,Railway: Railway continuously monitors main branch
+    Railway->>Railway: Detect new commit on main
     Railway->>Railway: Pull latest code
     Railway->>Railway: Build using railway.toml
     Railway->>Railway: Run health checks
@@ -596,10 +597,12 @@ sequenceDiagram
 
 **Key Integration Points:**
 
-1. **Webhook Trigger:** Railway monitors our GitHub repository via webhook
-2. **Quality Gates:** Railway only deploys if GitHub Actions pass (configured in Railway settings)
+1. **Repository Monitoring:** Railway continuously monitors our GitHub repository for changes to `main`
+2. **Independent Deployment:** Railway deploys automatically when it detects new commits (no webhook trigger from GitHub Actions)
 3. **Build Process:** Railway uses our `railway.toml` configuration for building
 4. **Health Checks:** Railway verifies our `/api/health` endpoint before switching traffic
+
+**Important:** GitHub Actions and Railway operate independently. GitHub Actions validates code quality, while Railway handles deployment when changes reach `main`.
 
 ### 🔐 Environment Variable Management
 
@@ -631,7 +634,8 @@ graph TB
 | `NEXTAUTH_SECRET` | ❌ Not needed | ✅ Required | Session encryption |
 | `NEXTAUTH_URL` | ❌ Not needed | ✅ Required | OAuth redirects |
 | `TURBO_TOKEN` | ✅ Build caching | ❌ Not needed | Faster CI builds |
-| `DATABASE_URL` | ✅ Test database | ✅ Production database | Data persistence |
+| `NODE_ENV` | ✅ Set to "test" | ✅ Set to "production" | Environment configuration |
+| `LOG_LEVEL` | ❌ Not needed | ✅ Set to "info" | Production logging |
 
 **Adding New Environment Variables:**
 
@@ -702,30 +706,29 @@ graph TD
 - 🚀 **Automatic Cleanup:** Deleted when PR is closed
 - 📧 **Team Notifications:** Slack/email alerts with preview links
 
-### 🗃️ Database Migrations (Future-Ready)
+### 🗃️ Database Strategy
 
-**Current State:** Finito Mail uses client-side IndexedDB storage, but we're prepared for server-side databases.
+**Current State:** Finito Mail uses **client-side IndexedDB storage only**. No server-side database migrations are required.
 
-**Migration Strategy (When Database Added):**
-```mermaid
-graph TD
-    A[Code + Migration Push] --> B[GitHub Actions]
-    B --> C[Test Migration on Test DB]
-    C --> D{Migration Success?}
-    D -->|Yes| E[Deploy to Railway]
-    D -->|No| F[Block Deployment]
-    E --> G[Railway Pre-Deploy Hook]
-    G --> H[Run Migration on Production]
-    H --> I{Migration Success?}
-    I -->|Yes| J[Deploy App Code]
-    I -->|No| K[Rollback + Alert]
-```
+**Data Architecture:**
+- **Email Storage:** IndexedDB in browser (up to 50GB+ per user)
+- **User Sessions:** NextAuth.js with secure httpOnly cookies
+- **Configuration:** Environment variables in Railway
+- **State Management:** Zustand for client-side state
 
-**Migration Safety Rules:**
-1. **Always Backward Compatible:** New code works with old schema
-2. **Multi-Step Process:** Add column → Deploy code → Remove old column
-3. **Rollback Plan:** Every migration has a rollback script
-4. **Test Environment:** Always test migrations on staging first
+**Benefits of Client-Side Storage:**
+- ✅ **Zero Migration Risk:** No database schema changes to deploy
+- ✅ **Instant Startup:** No database connection delays
+- ✅ **Offline Capability:** Full functionality without internet
+- ✅ **Privacy First:** User data never leaves their device
+- ✅ **Infinite Scale:** Each user manages their own data
+
+**Future Database Considerations:**
+If server-side database is added later, we will implement:
+1. **Migration Testing:** Automated migration tests in CI/CD
+2. **Rollback Strategies:** Backward-compatible schema changes
+3. **Health Monitoring:** Database connectivity checks
+4. **Backup Procedures:** Automated backup and recovery
 
 ### ⚡ Performance Optimizations
 
@@ -746,39 +749,41 @@ graph TD
 ```typescript
 // apps/web/src/app/api/health/route.ts
 export async function GET() {
-  const checks = [
-    await checkDatabase(),
-    await checkGmailAPI(),
-    await checkRedis()
-  ];
-  
-  const healthy = checks.every(check => check.healthy);
-  const status = healthy ? 'healthy' : 'degraded';
-  
-  return Response.json({ status, checks });
+  return NextResponse.json({ 
+    status: 'ok', 
+    timestamp: Date.now() 
+  });
 }
 ```
+
+**Current Health Check:**
+- ✅ **Simple Status:** Returns 200 OK if server is running
+- ✅ **Timestamp:** Provides deployment verification
+- ✅ **Fast Response:** < 100ms response time
+- ✅ **Railway Integration:** Used for deployment health verification
 
 **Monitoring Stack:**
 - 📊 **Railway Metrics:** Built-in application performance monitoring
 - 🚨 **GitHub Actions:** Build failure notifications
-- 📈 **Custom Metrics:** Business logic monitoring
-- 🔔 **Slack Integration:** Real-time alerts for issues
+- 📈 **Application Logs:** Server-side error tracking
+- 🔔 **Railway Alerts:** Service health notifications
 
-### 🔄 Advanced Deployment Strategies
+### 🔄 Railway Deployment Process
 
-**Blue-Green Deployments:** Railway handles this automatically
-1. **Blue (Current):** Running production version
-2. **Green (New):** New version being deployed
-3. **Health Check:** Verify green version is healthy
-4. **Traffic Switch:** Instant cutover to green version
-5. **Rollback Ready:** Keep blue version for instant rollback
+**Current Deployment Strategy:**
+Railway handles deployments automatically with built-in safety features:
 
-**Canary Deployments:** (Future enhancement)
-- 🎯 **Gradual Rollout:** 5% → 25% → 50% → 100% traffic
-- 📊 **Metrics Monitoring:** Error rates, response times
-- 🚨 **Automatic Rollback:** If metrics degrade
-- 👥 **User Feedback:** A/B testing integration
+1. **New Version Deploy:** Railway builds and starts new version
+2. **Health Check:** Verifies `/api/health` endpoint responds
+3. **Traffic Switch:** Routes all traffic to new version
+4. **Old Version Cleanup:** Removes previous version
+5. **Rollback Available:** One-click rollback to previous deployment
+
+**Deployment Safety Features:**
+- 🔄 **Automatic Restarts:** Up to 10 retry attempts on failure
+- 🩺 **Health Verification:** 20-second timeout with 30-second intervals
+- ⚡ **Instant Rollback:** Previous version available for immediate rollback
+- 📊 **Deployment Logs:** Complete visibility into deployment process
 
 ---
 
