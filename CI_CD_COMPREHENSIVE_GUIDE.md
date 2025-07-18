@@ -296,18 +296,24 @@ git push
    ```
 4. **Push the fix** → Pipeline runs again automatically
 
-#### **Scenario 2: Deployment Failure**
+#### **Scenario 2: Green CI, Red Deployment** 🚨 **CRITICAL**
 
 **Symptoms:**
+- ✅ GitHub Actions passed (all green checkmarks)
+- ✅ PR was merged to `main`
+- ❌ Application URL shows error or previous version
 - 🚂 Railway dashboard shows failed deployment
-- 🌐 Application is not accessible
-- 📊 Health checks failing
 
 **Resolution Steps:**
-1. **Check Railway logs** for error messages
-2. **Verify environment variables** are correctly set
-3. **Check for breaking changes** in dependencies
-4. **Rollback if necessary** (see Emergency Recovery below)
+1. **Check Railway logs immediately** (not GitHub Actions - they're independent)
+2. **Identify deployment failure cause**:
+   - **Build Failure**: Out of memory, Nixpacks issue, dependency problem
+   - **Start Failure**: `npm run start` script error, missing environment variables
+   - **Health Check Failure**: App started but didn't become healthy within 20 seconds
+3. **Immediate Recovery**: Use Railway UI to redeploy last known good commit
+4. **Fix root cause** and redeploy from fixed commit
+
+**Key Point**: GitHub Actions success ≠ Railway deployment success. Always check Railway logs first.
 
 #### **Scenario 3: Production Bug**
 
@@ -323,6 +329,21 @@ git push
    - Major issue → Immediate rollback
 3. **Communicate** with stakeholders
 4. **Deploy fix** through normal or expedited process
+
+#### **Scenario 4: Client-Side Data Schema Issues**
+
+**Symptoms:**
+- 🌐 App loads but features broken for returning users
+- 📊 JavaScript errors in browser console
+- 👥 Users with cached data experiencing issues
+
+**Resolution Steps:**
+1. **Check browser console** for IndexedDB errors
+2. **Verify data migration logic** in client-side code
+3. **Test with cached data** from previous app version
+4. **Implement data schema versioning** for future changes
+
+**Prevention**: Always include migration logic for IndexedDB schema changes
 
 ### ⚡ Emergency Recovery: Rolling Back
 
@@ -723,6 +744,16 @@ graph TD
 - ✅ **Privacy First:** User data never leaves their device
 - ✅ **Infinite Scale:** Each user manages their own data
 
+**Client-Side Data Schema Versioning:**
+Since Finito Mail uses browser IndexedDB for local data storage, developers must be mindful of data schema changes between releases. Any change to the structure of data stored locally must be accompanied by non-destructive migration logic within the client-side application code. This ensures that users with older data versions in their cache are seamlessly upgraded without data loss or application errors upon receiving the new version.
+
+**Best Practices for IndexedDB Changes:**
+1. **Version Your Schema:** Always increment IndexedDB database version
+2. **Migration Logic:** Include upgrade logic for each version change
+3. **Backward Compatibility:** New code should handle old data structures
+4. **Testing:** Test with data from previous app versions
+5. **Graceful Degradation:** Handle migration failures gracefully
+
 **Future Database Considerations:**
 If server-side database is added later, we will implement:
 1. **Migration Testing:** Automated migration tests in CI/CD
@@ -784,6 +815,8 @@ Railway handles deployments automatically with built-in safety features:
 - 🩺 **Health Verification:** 20-second timeout with 30-second intervals
 - ⚡ **Instant Rollback:** Previous version available for immediate rollback
 - 📊 **Deployment Logs:** Complete visibility into deployment process
+
+**Important Note:** Railway always deploys the *latest* commit from the `main` branch. If multiple commits are pushed in quick succession, Railway may cancel an in-progress deployment to begin a new one for the most recent commit.
 
 ---
 
