@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import { z } from 'zod'
 
+// Force dynamic rendering - this route generates unique tokens per request
+export const dynamic = 'force-dynamic'
+
 // Define a schema for optional mock user data from the test
 const mockUserSchema = z.object({
   email: z.string().email().default('test.user@example.com'),

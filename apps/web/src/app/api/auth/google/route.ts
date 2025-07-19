@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { generateCodeVerifier, generateCodeChallenge } from '@/lib/oauth'
 
+// Force dynamic rendering - this route generates unique codes per request
+export const dynamic = 'force-dynamic'
+
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
 

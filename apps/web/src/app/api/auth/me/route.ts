@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 
+// Force dynamic rendering - this route uses dynamic data (request headers)
+export const dynamic = 'force-dynamic'
+
 interface MockUserPayload {
   email: string
   name: string
