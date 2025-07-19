@@ -20,14 +20,15 @@ const nextConfig = {
   compress: true,
   // Enable standalone output for Docker if needed
   // output: 'standalone',
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`,
-      },
-    ]
-  },
+  // Removed API rewrites for single-app deployment
+  // async rewrites() {
+  //   return [
+  //     {
+  //       source: '/api/:path*',
+  //       destination: `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`,
+  //     },
+  //   ]
+  // },
   async headers() {
     return [
       {
