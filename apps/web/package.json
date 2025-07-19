@@ -3,11 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p ${PORT:-3000}",
+    "dev": "next dev -p ${PORT:-3001}",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:e2e": "E2E_TESTING=true playwright test",
+    "test:e2e:ui": "E2E_TESTING=true playwright test --ui",
+    "test:e2e:headed": "E2E_TESTING=true playwright test --headed",
+    "test:e2e:debug": "E2E_TESTING=true playwright test --debug",
+    "playwright:install": "playwright install"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -26,9 +31,11 @@
     "@radix-ui/react-switch": "^1.2.5",
     "@radix-ui/react-tooltip": "^1.0.7",
     "@tanstack/react-virtual": "^3.0.1",
+    "@types/jsonwebtoken": "^9.0.10",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^11.0.3",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.303.0",
     "next": "14.2.30",
     "react": "^18.2.0",
@@ -38,6 +45,7 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.1",
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",

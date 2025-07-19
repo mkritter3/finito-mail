@@ -1,0 +1,38 @@
+{
+  "messages": [
+    {
+      "id": "18f9b8c0a8c3b1a1",
+      "threadId": "18f9b8c0a8c3b1a1",
+      "snippet": "This is a test email for Playwright mocking. Welcome to Finito Mail testing!",
+      "payload": {
+        "headers": [
+          { "name": "From", "value": "sender@example.com" },
+          { "name": "To", "value": "test.user@example.com" },
+          { "name": "Subject", "value": "Test Email Subject" },
+          { "name": "Date", "value": "Wed, 18 Jul 2025 10:00:00 +0000" }
+        ],
+        "body": {
+          "data": "VGhpcyBpcyBhIHRlc3QgZW1haWwgZm9yIFBsYXl3cmlnaHQgbW9ja2luZy4gV2VsY29tZSB0byBGaW5pdG8gTWFpbCB0ZXN0aW5nIQ=="
+        }
+      }
+    },
+    {
+      "id": "28f9b8c0a8c3b1b2",
+      "threadId": "28f9b8c0a8c3b1b2", 
+      "snippet": "Second test email with different content for comprehensive testing scenarios.",
+      "payload": {
+        "headers": [
+          { "name": "From", "value": "another@example.com" },
+          { "name": "To", "value": "test.user@example.com" },
+          { "name": "Subject", "value": "Another Test Email" },
+          { "name": "Date", "value": "Wed, 18 Jul 2025 11:30:00 +0000" }
+        ],
+        "body": {
+          "data": "U2Vjb25kIHRlc3QgZW1haWwgd2l0aCBkaWZmZXJlbnQgY29udGVudCBmb3IgY29tcHJlaGVuc2l2ZSB0ZXN0aW5nIHNjZW5hcmlvcy4="
+        }
+      }
+    }
+  ],
+  "resultSizeEstimate": 2,
+  "nextPageToken": null
+}
