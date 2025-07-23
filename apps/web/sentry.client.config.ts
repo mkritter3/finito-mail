@@ -47,8 +47,6 @@ Sentry.init({
       ],
       // Ignore specific form inputs entirely
       ignore: [
-        'input[type="password"]',
-        'input[type="email"]',
         'input[autocomplete*="cc-"]',  // Credit card fields
         '[data-sentry-ignore]',
       ],

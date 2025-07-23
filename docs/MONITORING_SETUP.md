@@ -112,6 +112,12 @@ curl -H "x-health-api-key: YOUR_HEALTH_CHECK_API_KEY" \
   http://localhost:3000/api/health
 ```
 
+**⚠️ Important:** The health check must be called regularly (every 1-2 minutes) for memory metrics to be sent to Sentry. Set up external monitoring with:
+- UptimeRobot or Pingdom
+- CloudWatch Events + Lambda
+- Kubernetes liveness/readiness probes
+- Cron job with curl
+
 **Monitored Components:**
 - Database connectivity
 - Redis cache status
