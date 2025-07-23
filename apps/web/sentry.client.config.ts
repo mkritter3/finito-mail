@@ -22,8 +22,36 @@ Sentry.init({
   // Integrations
   integrations: [
     Sentry.replayIntegration({
+      // Privacy-first: mask all text by default
       maskAllText: true,
+      // Privacy-first: block all media by default
       blockAllMedia: true,
+      // Selectively unmask elements known to be safe
+      unmask: [
+        '.sentry-unmask',        // Generic unmask class
+        '.safe-for-replay',      // Alternative naming
+        '[data-sentry-unmask]',  // Data attribute approach
+      ],
+      // Extra blocking for highly sensitive areas
+      block: [
+        '.sentry-block',         // Generic block class
+        '.sensitive-data',       // Semantic class name
+        '[data-sentry-block]',   // Data attribute approach
+        // Common sensitive selectors
+        'input[type="password"]',
+        'input[type="email"]',
+        'input[name*="token"]',
+        'input[name*="secret"]',
+        '.credit-card-input',
+        '.ssn-input',
+      ],
+      // Ignore specific form inputs entirely
+      ignore: [
+        'input[type="password"]',
+        'input[type="email"]',
+        'input[autocomplete*="cc-"]',  // Credit card fields
+        '[data-sentry-ignore]',
+      ],
     }),
     Sentry.browserTracingIntegration(),
   ],

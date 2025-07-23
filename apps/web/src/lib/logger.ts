@@ -105,27 +105,45 @@ export function createScopedLogger(context: string) {
     // Performance tracking
     time: (label: string) => {
       const start = Date.now()
-      const transaction = Sentry.startTransaction({
+      
+      // Get the currently active transaction (from auto-instrumentation or manual)
+      const activeTransaction = Sentry.getActiveTransaction()
+      
+      // Create a child span if a transaction exists, otherwise no-op for tracing
+      const span = activeTransaction?.startChild({
         op: 'function',
-        name: `${context}.${label}`,
+        description: `${context}.${label}`,
       })
       
       return {
         end: (meta?: Record<string, any>) => {
           const duration = Date.now() - start
+          
+          // Always log to our structured logger
           scopedLogger.info(`${label} completed`, {
             duration,
             ...meta,
           })
           
-          transaction.finish()
+          // Finish the span if it exists
+          span?.finish()
           
           // Log slow operations to Sentry
           if (duration > 1000) {
+            // Add data to the span for better context
+            span?.setTag('slow', 'true')
+            span?.setData('duration_ms', duration)
+            if (meta) {
+              Object.entries(meta).forEach(([key, value]) => {
+                span?.setData(key, value)
+              })
+            }
+            
+            // Also send a warning message
             Sentry.captureMessage(`Slow operation: ${context}.${label}`, {
               level: 'warning',
-              extra: { duration, ...meta },
-              tags: { context, operation: label },
+              extra: { duration, context, ...meta },
+              tags: { context, operation: label, slow_operation: 'true' },
             })
           }
           
@@ -159,16 +177,23 @@ export function withLogging<T extends (...args: any[]) => any>(
     const requestId = crypto.randomUUID()
     const requestLogger = createScopedLogger(options?.context || 'api')
     
-    // Start Sentry transaction
-    const transaction = Sentry.startTransaction({
-      op: 'http.server',
-      name: options?.name || handler.name || 'anonymous',
+    // Get the active transaction that Sentry auto-instrumentation created
+    const transaction = Sentry.getActiveTransaction()
+    const scope = Sentry.getCurrentScope()
+    
+    // Add custom context to the existing transaction
+    scope.setTag('requestId', requestId)
+    scope.setContext('request_details', { 
+      requestId,
+      handler: options?.name || handler.name || 'anonymous',
+      context: options?.context || 'api'
     })
     
-    Sentry.configureScope((scope) => {
-      scope.setSpan(transaction)
-      scope.setContext('request', { requestId })
-    })
+    // If there's a transaction, we can also add custom data
+    if (transaction) {
+      transaction.setData('requestId', requestId)
+      transaction.setData('handler', options?.name || handler.name || 'anonymous')
+    }
 
     try {
       requestLogger.info('Request started', {
@@ -185,7 +210,7 @@ export function withLogging<T extends (...args: any[]) => any>(
         duration,
       })
       
-      transaction.setStatus('ok')
+      // The transaction status is automatically managed by Sentry
       return result
     } catch (error) {
       const duration = Date.now() - start
@@ -196,10 +221,9 @@ export function withLogging<T extends (...args: any[]) => any>(
         duration,
       })
       
-      transaction.setStatus('internal_error')
+      // Sentry auto-instrumentation will handle the error status
       throw error
-    } finally {
-      transaction.finish()
     }
+    // No need for finally block - Sentry manages transaction lifecycle
   }) as T
 }
