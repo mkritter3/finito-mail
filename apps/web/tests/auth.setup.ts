@@ -16,10 +16,15 @@ setup('authenticate', async ({ page }) => {
   await login(page, mockUser)
   
   // Navigate to the app to verify authentication works
-  await page.goto('/auth')
+  // For WebKit, we need to handle navigation differently
+  try {
+    await page.goto('/auth')
+  } catch (e) {
+    // Navigation might be interrupted by redirect, which is expected
+  }
   
-  // Wait for redirect to mail dashboard (indicates successful auth)
-  await page.waitForURL('**/mail', { timeout: 10000 })
+  // Wait for the mail page to load (handles both /mail and /mail/inbox)
+  await page.waitForURL(/\/mail/, { timeout: 10000 })
   
   // Verify we're on the mail page
   await expect(page).toHaveURL(/\/mail/)

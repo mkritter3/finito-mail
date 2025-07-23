@@ -71,6 +71,13 @@ export async function login(
  * @param page The Playwright Page object
  */
 export async function logout(page: Page) {
+  // First navigate to a page to ensure localStorage is accessible
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+  } catch {
+    // Ignore navigation errors - we just need any valid page
+  }
+  
   await page.evaluate(() => {
     localStorage.removeItem('finito_auth_token')
     localStorage.removeItem('gmail_access_token')

@@ -75,18 +75,32 @@ export function Header() {
         <button className="text-sm text-muted-foreground hover:text-foreground">
           Settings
         </button>
-        <div className="relative group">
-          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-medium text-white cursor-pointer">
+        <div className="relative">
+          <button 
+            className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-medium text-white relative z-10"
+            onClick={(e) => {
+              e.stopPropagation()
+              const dropdown = e.currentTarget.nextElementSibling
+              if (dropdown) {
+                dropdown.classList.toggle('hidden')
+              }
+            }}
+            aria-label="User menu"
+          >
             {userEmail.charAt(0).toUpperCase()}
-          </div>
-          <div className="absolute right-0 mt-2 w-48 bg-background border border-border rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+          </button>
+          <div className="hidden absolute right-0 mt-2 w-48 bg-background border border-border rounded-md shadow-lg z-50">
             <div className="p-3 border-b border-border">
               <p className="text-sm font-medium truncate">{userEmail}</p>
               <p className="text-xs text-muted-foreground">Gmail Account</p>
             </div>
             <button
-              onClick={logout}
+              onClick={(e) => {
+                e.stopPropagation()
+                logout()
+              }}
               className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+              aria-label="Sign out"
             >
               Sign out
             </button>

@@ -29,18 +29,18 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({})) // Handle empty body
     const mockUser = mockUserSchema.parse(body)
 
-    // Get JWT secret for signing tokens
-    const jwtSecret = process.env.JWT_SECRET
+    // Get JWT secret for signing tokens - use same secret as auth middleware
+    const jwtSecret = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET
     if (!jwtSecret) {
-      throw new Error('JWT_SECRET environment variable is not set for testing')
+      throw new Error('NEXTAUTH_SECRET or JWT_SECRET environment variable is not set for testing')
     }
 
-    // Create a secure JWT token with user data
+    // Create a secure JWT token with user data - match the format expected by auth middleware
     const finito_auth_token = jwt.sign(
       {
+        sub: mockUser.id, // auth middleware expects 'sub' field for user ID
         email: mockUser.email,
         name: mockUser.name,
-        id: mockUser.id,
         picture: mockUser.picture,
         verified_email: mockUser.verified_email,
         // Add testing metadata

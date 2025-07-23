@@ -114,6 +114,7 @@ export default defineConfig({
       PORT: '3001',
       E2E_TESTING: 'true',
       JWT_SECRET: 'test-secret-for-e2e-testing-do-not-use-in-production',
+      NEXTAUTH_SECRET: 'test-secret-for-e2e-testing-do-not-use-in-production',
       NEXT_PUBLIC_BASE_URL: 'http://localhost:3001',
       GOOGLE_CLIENT_ID: 'mock-client-id',
       GOOGLE_CLIENT_SECRET: 'mock-client-secret',

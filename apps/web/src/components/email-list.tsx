@@ -29,6 +29,14 @@ export function EmailList({ folder }: EmailListProps) {
   const [error, setError] = useState<string | null>(null)
   const parentRef = useRef<HTMLDivElement>(null)
 
+  // All hooks must be called before any conditional returns
+  const virtualizer = useVirtualizer({
+    count: emails.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 80,
+    overscan: 5,
+  })
+
   useEffect(() => {
     const fetchEmails = async () => {
       try {
@@ -81,13 +89,6 @@ export function EmailList({ folder }: EmailListProps) {
       </div>
     )
   }
-
-  const virtualizer = useVirtualizer({
-    count: emails.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 80,
-    overscan: 5,
-  })
 
   return (
     <div className="h-full flex flex-col">

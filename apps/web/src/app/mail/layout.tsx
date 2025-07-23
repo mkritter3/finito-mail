@@ -29,6 +29,13 @@ export default function MailLayout({
   const [dbInitialized, setDbInitialized] = useState(false)
   
   useEffect(() => {
+    // Check authentication
+    const token = localStorage.getItem('finito_auth_token')
+    if (!token) {
+      window.location.href = '/auth'
+      return
+    }
+    
     if (!dbInitialized) {
       initializeDatabase()
       setDbInitialized(true)

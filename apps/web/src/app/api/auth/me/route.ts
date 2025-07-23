@@ -5,9 +5,10 @@ import jwt from 'jsonwebtoken'
 export const dynamic = 'force-dynamic'
 
 interface MockUserPayload {
+  sub?: string  // Standard JWT subject field for user ID
   email: string
   name: string
-  id: string
+  id?: string   // Legacy field, kept for backwards compatibility
   picture: string
   verified_email: boolean
   isMockUser: boolean
@@ -34,9 +35,9 @@ export async function GET(request: NextRequest) {
     // CRITICAL: Multi-layered guard for test-only logic
     if (process.env.NODE_ENV !== 'production' && process.env.E2E_TESTING === 'true') {
       try {
-        const jwtSecret = process.env.JWT_SECRET
+        const jwtSecret = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET
         if (!jwtSecret) {
-          throw new Error('JWT_SECRET environment variable is not set for testing')
+          throw new Error('NEXTAUTH_SECRET or JWT_SECRET environment variable is not set for testing')
         }
 
         // Verify the finito_auth_token JWT using the test secret
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
         }
 
         return NextResponse.json({
-          id: decoded.id,
+          id: decoded.sub || decoded.id || 'unknown', // Use sub field first (standard JWT), fall back to id
           email: decoded.email,
           name: decoded.name,
           picture: decoded.picture,

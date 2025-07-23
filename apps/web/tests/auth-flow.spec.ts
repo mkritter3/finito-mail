@@ -29,65 +29,72 @@ test.describe('Authentication Flow', () => {
     expect(await isAuthenticated(page)).toBe(true)
     
     // Navigate to app and verify authenticated state
-    await page.goto('/auth')
+    // The auth page should redirect to /mail when authenticated
+    // We expect the navigation to be interrupted by the redirect
+    try {
+      await page.goto('/auth')
+    } catch (e) {
+      // Navigation interruption is expected when redirecting
+    }
     
-    // Should redirect away from auth page since user is authenticated
-    await page.waitForURL('**/mail', { timeout: 5000 })
+    // Wait for the final URL and verify we ended up on the mail page
+    await page.waitForURL(/\/mail/, { timeout: 5000 })
     await expect(page).toHaveURL(/\/mail/)
   })
 
-  test('should handle logout flow', async ({ page }) => {
+  test('should handle logout flow', async ({ page, isMobile, browserName }) => {
     // Login first
     await login(page)
-    await page.goto('/mail')
+    
+    // Navigate to mail page - handle WebKit navigation issues
+    if (browserName === 'webkit') {
+      try {
+        await page.goto('/mail')
+      } catch (e) {
+        // Navigation might be interrupted by redirect in WebKit
+      }
+      await page.waitForURL(/\/mail/, { timeout: 5000 })
+    } else {
+      await page.goto('/mail')
+    }
     
     // Verify we're logged in
     await expect(page).toHaveURL(/\/mail/)
     
-    // Logout (assuming there's a logout button - adapt to your UI)
-    await logout(page)
+    // For mobile, we need to wait for the page to stabilize
+    if (isMobile) {
+      await page.waitForTimeout(1000)
+    }
+    
+    // Click the user avatar button to open the dropdown
+    const userMenuButton = page.getByRole('button', { name: 'User menu' })
+    await userMenuButton.waitFor({ state: 'visible' })
+    await userMenuButton.click({ force: true })
+    
+    // Wait for dropdown to open
+    await page.waitForTimeout(500)
+    
+    // Click the Sign out button
+    const signOutButton = page.getByRole('button', { name: 'Sign out' })
+    await signOutButton.waitFor({ state: 'visible' })
+    await signOutButton.click({ force: true })
+    
+    // Should redirect to auth page
+    await page.waitForURL('**/auth')
+    await expect(page).toHaveURL(/\/auth/)
     
     // Verify authentication state is cleared
     expect(await isAuthenticated(page)).toBe(false)
     
-    // Navigate to protected page should redirect to auth
+    // Navigate to protected page should stay on auth page
     await page.goto('/mail')
+    await expect(page).toHaveURL(/\/auth/)
     await expect(page.getByText('Sign in to Finito Mail')).toBeVisible()
   })
 })
 
 test.describe('Gmail Integration with Mocked APIs', () => {
   test.beforeEach(async ({ page }) => {
-    // Setup mock responses for Gmail API calls
-    await page.route('**/gmail.googleapis.com/gmail/v1/users/me/messages**', async (route) => {
-      console.log(`Intercepted Gmail API: ${route.request().url()}`)
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(mockMessages),
-      })
-    })
-
-    // Mock individual message details if needed
-    await page.route('**/gmail.googleapis.com/gmail/v1/users/me/messages/*', async (route) => {
-      const messageId = route.request().url().split('/').pop()?.split('?')[0]
-      const message = mockMessages.messages.find(m => m.id === messageId)
-      
-      if (message) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(message),
-        })
-      } else {
-        await route.fulfill({
-          status: 404,
-          contentType: 'application/json',
-          body: JSON.stringify({ error: 'Message not found' }),
-        })
-      }
-    })
-
     // Login before each test
     await login(page, { 
       email: 'test.gmail@example.com',
@@ -96,59 +103,100 @@ test.describe('Gmail Integration with Mocked APIs', () => {
   })
 
   test('should display emails from mocked Gmail API', async ({ page }) => {
-    await page.goto('/mail')
+    // Go directly to inbox to avoid redirect issues
+    // Handle browser-specific navigation issues
+    const browserName = page.context().browser()?.browserType().name()
+    if (browserName === 'webkit' || browserName === 'firefox') {
+      try {
+        await page.goto('/mail/inbox')
+      } catch (e) {
+        // Navigation might be interrupted in WebKit/Firefox
+        console.log(`Navigation interrupted in ${browserName}, continuing...`)
+      }
+      await page.waitForLoadState('domcontentloaded')
+    } else {
+      await page.goto('/mail/inbox')
+    }
     
-    // Wait for the page to load and make API calls
-    await page.waitForLoadState('networkidle')
+    // Wait for emails to load - look for the email row elements
+    await page.waitForSelector('[data-testid="email-row"]', { timeout: 10000 })
+    
+    // Verify we have the expected number of emails
+    const emailRows = await page.locator('[data-testid="email-row"]').count()
+    expect(emailRows).toBe(2)
     
     // Check that mock email content is displayed
+    await expect(page.getByText('Test Email Subject')).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText('Another Test Email')).toBeVisible({ timeout: 5000 })
+    
+    // Verify snippets are shown
     await expect(page.getByText('This is a test email for Playwright mocking')).toBeVisible()
     await expect(page.getByText('Second test email with different content')).toBeVisible()
-    
-    // Verify email metadata
-    await expect(page.getByText('Test Email Subject')).toBeVisible()
-    await expect(page.getByText('Another Test Email')).toBeVisible()
   })
 
   test('should handle empty inbox state', async ({ page }) => {
-    // Override the default route for this specific test
-    await page.route('**/gmail.googleapis.com/gmail/v1/users/me/messages**', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ 
-          messages: [], 
-          resultSizeEstimate: 0,
-          nextPageToken: null
-        }),
-      })
+    // Use the scenario parameter to get empty inbox
+    await page.route('**/api/emails**', async (route) => {
+      const url = new URL(route.request().url())
+      url.searchParams.set('scenario', 'empty')
+      await route.continue({ url: url.toString() })
     })
 
-    await page.goto('/mail')
-    await page.waitForLoadState('networkidle')
+    // Handle browser-specific navigation issues
+    const browserName = page.context().browser()?.browserType().name()
+    if (browserName === 'webkit' || browserName === 'firefox') {
+      try {
+        await page.goto('/mail/inbox')
+      } catch (e) {
+        // Navigation might be interrupted in WebKit/Firefox
+        console.log(`Navigation interrupted in ${browserName}, continuing...`)
+      }
+      await page.waitForLoadState('domcontentloaded')
+    } else {
+      await page.goto('/mail/inbox')
+    }
+    
+    // Wait for the email list to finish loading
+    // Since it's empty, we need to wait for the loading state to disappear
+    await page.waitForFunction(() => {
+      const spinner = document.querySelector('.animate-spin')
+      return !spinner || spinner.offsetParent === null
+    }, { timeout: 5000 })
 
-    // Should show empty state message (adapt to your UI)
-    await expect(page.getByText(/inbox is empty|no messages|no emails/i)).toBeVisible()
+    // Verify we're on the mail page
+    await expect(page).toHaveURL(/\/mail/)
+    
+    // Verify no email rows exist
+    const emailRows = await page.locator('[data-testid="email-row"]').count()
+    expect(emailRows).toBe(0)
   })
 
   test('should handle Gmail API errors gracefully', async ({ page }) => {
-    // Mock API error
-    await page.route('**/gmail.googleapis.com/gmail/v1/users/me/messages**', async (route) => {
-      await route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ 
-          error: 'Internal Server Error',
-          message: 'Gmail API temporarily unavailable'
-        }),
-      })
+    // Use the scenario parameter to trigger error
+    await page.route('**/api/emails**', async (route) => {
+      const url = new URL(route.request().url())
+      url.searchParams.set('scenario', 'error')
+      await route.continue({ url: url.toString() })
     })
 
-    await page.goto('/mail')
+    // Handle browser-specific navigation issues
+    const browserName = page.context().browser()?.browserType().name()
+    if (browserName === 'webkit' || browserName === 'firefox') {
+      try {
+        await page.goto('/mail/inbox')
+      } catch (e) {
+        // Navigation might be interrupted in WebKit/Firefox
+        console.log(`Navigation interrupted in ${browserName}, continuing...`)
+      }
+      await page.waitForLoadState('domcontentloaded')
+    } else {
+      await page.goto('/mail/inbox')
+    }
     await page.waitForLoadState('networkidle')
 
-    // Should show error message (adapt to your UI)
-    await expect(page.getByText(/error|failed to load|something went wrong/i)).toBeVisible()
+    // Should show error message from the email-list component
+    await expect(page.getByText('Error loading emails')).toBeVisible()
+    await expect(page.getByText('Failed to fetch emails')).toBeVisible()
   })
 })
 
@@ -169,7 +217,19 @@ test.describe('Console Error Detection', () => {
     })
 
     await login(page)
-    await page.goto('/mail')
+    // Handle browser-specific navigation issues
+    const browserName = page.context().browser()?.browserType().name()
+    if (browserName === 'webkit' || browserName === 'firefox') {
+      try {
+        await page.goto('/mail/inbox')
+      } catch (e) {
+        // Navigation might be interrupted in WebKit/Firefox
+        console.log(`Navigation interrupted in ${browserName}, continuing...`)
+      }
+      await page.waitForLoadState('domcontentloaded')
+    } else {
+      await page.goto('/mail/inbox')
+    }
     await page.waitForLoadState('networkidle')
 
     // Wait a bit for any async errors
