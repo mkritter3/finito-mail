@@ -40,6 +40,7 @@ All documentation is **immutable** - these files represent permanent architectur
 17. **[UI_DESIGN.md](./UI_DESIGN.md)** - Complete UI/UX design system and layout specifications
 18. **[KEYBOARD_SHORTCUTS.md](./KEYBOARD_SHORTCUTS.md)** - Comprehensive keyboard shortcut reference
 19. **[DATA_STRATEGY.md](./DATA_STRATEGY.md)** - Data durability, backup, and sync strategies
+20. **[MONITORING_SETUP.md](./MONITORING_SETUP.md)** - Production monitoring with Sentry APM integration
 
 ## Quick Start
 

@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createScopedLogger, withLogging } from '@/lib/logger'
 
 // Force dynamic rendering - this route uses dynamic data (search params)
 export const dynamic = 'force-dynamic'
 
+const logger = createScopedLogger('auth.callback')
+
 export async function GET(request: NextRequest) {
+  const timer = logger.time('oauth-callback')
+  
   try {
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
@@ -12,11 +17,20 @@ export async function GET(request: NextRequest) {
 
     // Handle OAuth errors
     if (error) {
-      console.error('OAuth error:', error)
+      logger.error(`OAuth provider error: ${error}`, {
+        error,
+        description: searchParams.get('error_description')
+      })
+      timer.end({ status: 'oauth_error' })
       return NextResponse.redirect(new URL(`/auth?error=${encodeURIComponent(error)}`, request.url))
     }
 
     if (!code || !state) {
+      logger.warn('Missing OAuth parameters', {
+        hasCode: !!code,
+        hasState: !!state
+      })
+      timer.end({ status: 'missing_parameters' })
       return NextResponse.redirect(new URL('/auth?error=missing_parameters', request.url))
     }
 
@@ -29,10 +43,13 @@ export async function GET(request: NextRequest) {
     const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || ''
 
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      console.error('OAuth not configured')
+      logger.error('OAuth not configured - missing credentials')
+      timer.end({ status: 'not_configured' })
       return NextResponse.redirect(new URL('/auth?error=oauth_not_configured', request.url))
     }
 
+    const tokenTimer = logger.time('token-exchange')
+    
     const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
       method: 'POST',
       headers: {
@@ -48,13 +65,30 @@ export async function GET(request: NextRequest) {
       }).toString(),
     })
 
+    const tokenDuration = tokenTimer.end()
+
     if (!tokenResponse.ok) {
-      const error = await tokenResponse.text()
-      console.error('Token exchange error:', error)
+      const errorText = await tokenResponse.text()
+      logger.error('Token exchange failed', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        error: errorText,
+        duration: tokenDuration
+      })
+      timer.end({ status: 'token_exchange_failed' })
       return NextResponse.redirect(new URL('/auth?error=token_exchange_failed', request.url))
     }
 
     const tokens = await tokenResponse.json()
+    
+    logger.info('OAuth flow completed successfully', {
+      hasRefreshToken: !!tokens.refresh_token,
+      expiresIn: tokens.expires_in,
+      tokenType: tokens.token_type,
+      scopes: tokens.scope?.split(' ') || []
+    })
+
+    timer.end({ status: 'success' })
 
     // Store tokens in a temporary location or return them to the frontend
     // For now, let's redirect to a success page with tokens in URL params (not secure for production)
@@ -67,7 +101,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(successUrl)
   } catch (error) {
-    console.error('Callback error:', error)
+    logger.error(error instanceof Error ? error : new Error('Callback processing failed'), {
+      message: 'OAuth callback error'
+    })
+    timer.end({ status: 'error' })
     return NextResponse.redirect(new URL('/auth?error=internal_error', request.url))
   }
 }

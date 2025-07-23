@@ -1,3 +1,5 @@
+const { withSentryConfig } = require('@sentry/nextjs')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -52,4 +54,37 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+// Sentry configuration for source maps and releases
+const sentryWebpackPluginOptions = {
+  // For all available options, see:
+  // https://github.com/getsentry/sentry-webpack-plugin#options
+
+  // Suppresses source map uploading logs during build
+  silent: true,
+  
+  // Organization and project from your Sentry account
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // Auth token for uploading source maps
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Only upload source maps in production builds
+  dryRun: process.env.NODE_ENV !== 'production',
+  
+  // Automatically release tracking
+  release: process.env.NEXT_PUBLIC_APP_VERSION || 'unknown',
+}
+
+// Export with Sentry wrapper for automatic instrumentation
+module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions, {
+  // Hide Sentry comments from source files
+  hideSourceMaps: true,
+  
+  // Tree shake unused Sentry code
+  disableLogger: true,
+  
+  // Automatically instrument your app
+  autoInstrumentServerFunctions: true,
+  autoInstrumentAppDirectory: true,
+})

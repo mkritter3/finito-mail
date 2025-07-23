@@ -1,0 +1,190 @@
+# Sentry Alert Rules Configuration for Finito Mail
+# Import this configuration in your Sentry project settings
+
+alerts:
+  # Critical Alerts - Immediate Action Required
+  - name: "Production Down - Health Check Failed"
+    type: "metric"
+    dataset: "transactions"
+    aggregate: "failure_rate()"
+    query: 'transaction:"GET /api/health"'
+    threshold: 0.5  # 50% failure rate
+    window: "2m"
+    environment: "production"
+    frequency: "1m"
+    actions:
+      - type: "email"
+        targetType: "team"
+        targetIdentifier: "engineering"
+      - type: "pagerduty"
+        account: "finito-mail"
+        service: "production-health"
+    
+  - name: "Authentication System Failure"
+    type: "metric"
+    dataset: "transactions"
+    aggregate: "failure_rate()"
+    query: 'transaction:"GET /api/auth/*"'
+    threshold: 0.25  # 25% failure rate
+    window: "5m"
+    environment: "production"
+    frequency: "1m"
+    actions:
+      - type: "email"
+        targetType: "team"
+        targetIdentifier: "engineering"
+      - type: "slack"
+        workspace: "finito"
+        channel: "#alerts-critical"
+
+  # High Priority Alerts
+  - name: "High Error Rate"
+    type: "metric"
+    dataset: "events"
+    aggregate: "count()"
+    query: "level:error"
+    threshold: 100  # 100 errors
+    window: "10m"
+    environment: "production"
+    frequency: "5m"
+    actions:
+      - type: "email"
+        targetType: "team"
+        targetIdentifier: "engineering"
+      - type: "slack"
+        workspace: "finito"
+        channel: "#alerts"
+
+  - name: "Database Connection Errors"
+    type: "issue"
+    conditions:
+      all:
+        - name: "event_frequency"
+          value: 10
+          interval: "5m"
+    filter:
+      match: "all"
+      conditions:
+        - attribute: "message"
+          match: "contains"
+          value: "database"
+        - attribute: "level"
+          match: "equals"
+          value: "error"
+    actions:
+      - type: "email"
+        targetType: "team"
+        targetIdentifier: "backend"
+
+  - name: "Memory Leak Detection"
+    type: "metric"
+    dataset: "custom"
+    aggregate: "avg(measurements.memory.percentage)"
+    threshold: 90  # 90% memory usage
+    window: "10m"
+    environment: "production"
+    frequency: "5m"
+    actions:
+      - type: "email"
+        targetType: "team"
+        targetIdentifier: "engineering"
+      - type: "slack"
+        workspace: "finito"
+        channel: "#alerts"
+
+  # Performance Alerts
+  - name: "Slow API Response Times"
+    type: "metric"
+    dataset: "transactions"
+    aggregate: "p95(transaction.duration)"
+    query: 'transaction.op:"http.server"'
+    threshold: 3000  # 3 seconds
+    window: "10m"
+    environment: "production"
+    frequency: "5m"
+    actions:
+      - type: "slack"
+        workspace: "finito"
+        channel: "#performance"
+
+  - name: "Email Sync Performance Degradation"
+    type: "metric"
+    dataset: "transactions"
+    aggregate: "p95(transaction.duration)"
+    query: 'transaction:"GET /api/emails"'
+    threshold: 2000  # 2 seconds
+    window: "5m"
+    environment: "production"
+    frequency: "2m"
+    actions:
+      - type: "email"
+        targetType: "user"
+        targetIdentifier: "on-call"
+
+  # Security Alerts
+  - name: "Suspicious Authentication Activity"
+    type: "metric"
+    dataset: "events"
+    aggregate: "count()"
+    query: 'message:"Unauthorized email access attempt"'
+    threshold: 50  # 50 attempts
+    window: "5m"
+    environment: "production"
+    frequency: "1m"
+    actions:
+      - type: "email"
+        targetType: "team"
+        targetIdentifier: "security"
+      - type: "slack"
+        workspace: "finito"
+        channel: "#security-alerts"
+
+  - name: "OAuth Token Failures"
+    type: "metric"
+    dataset: "events"
+    aggregate: "count()"
+    query: 'message:"Token exchange failed"'
+    threshold: 10
+    window: "5m"
+    environment: "production"
+    frequency: "2m"
+    actions:
+      - type: "email"
+        targetType: "team"
+        targetIdentifier: "backend"
+
+# Alert Notification Rules
+notification_settings:
+  email:
+    rate_limit: "10/hour"
+    batch_window: "60s"
+  slack:
+    rate_limit: "20/hour"
+    batch_window: "30s"
+  pagerduty:
+    rate_limit: "5/hour"
+    escalation_policy: "standard"
+
+# Team Definitions
+teams:
+  engineering:
+    members:
+      - "engineering@finito-mail.com"
+    slack_channel: "#engineering"
+  backend:
+    members:
+      - "backend@finito-mail.com"
+    slack_channel: "#backend"
+  security:
+    members:
+      - "security@finito-mail.com"
+    slack_channel: "#security"
+
+# Environments
+environments:
+  - name: "production"
+    notify: true
+  - name: "staging"
+    notify: false
+  - name: "development"
+    notify: false

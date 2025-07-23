@@ -16,7 +16,8 @@
   ],
   "scripts": {
     "dev": "turbo dev",
-    "build": "turbo build",
+    "build": "turbo build --filter=@finito/web",
+    "start": "cd apps/web && npm start",
     "test": "turbo test",
     "lint": "turbo lint",
     "type-check": "turbo type-check",
@@ -43,6 +44,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "@sentry/nextjs": "^9.40.0",
     "opossum": "^9.0.0",
     "pino": "^9.7.0",
     "zod": "^4.0.5"

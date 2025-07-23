@@ -1,0 +1,136 @@
+{
+  "name": "Finito Mail - Production Monitoring",
+  "description": "Main dashboard for monitoring Finito Mail application health and performance",
+  "widgets": [
+    {
+      "title": "Error Rate",
+      "type": "line-chart",
+      "query": "event.type:error",
+      "displayType": "line",
+      "interval": "5m",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 2
+      }
+    },
+    {
+      "title": "Transaction Performance",
+      "type": "line-chart",
+      "query": "event.type:transaction",
+      "displayType": "line",
+      "interval": "5m",
+      "yAxis": "p95()",
+      "position": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 2
+      }
+    },
+    {
+      "title": "Health Check Status",
+      "type": "line-chart",
+      "query": "transaction.op:http.server transaction:\"GET /api/health\"",
+      "displayType": "line",
+      "interval": "1m",
+      "position": {
+        "x": 0,
+        "y": 2,
+        "w": 4,
+        "h": 2
+      }
+    },
+    {
+      "title": "OAuth Success Rate",
+      "type": "percentage",
+      "query": "transaction.op:http.server (transaction:\"GET /api/auth/google\" OR transaction:\"GET /api/auth/callback\")",
+      "displayType": "percentage",
+      "interval": "1h",
+      "position": {
+        "x": 4,
+        "y": 2,
+        "w": 4,
+        "h": 2
+      }
+    },
+    {
+      "title": "Email API Performance",
+      "type": "line-chart",
+      "query": "transaction.op:http.server transaction:\"GET /api/emails\"",
+      "displayType": "line",
+      "interval": "5m",
+      "yAxis": "p95()",
+      "position": {
+        "x": 8,
+        "y": 2,
+        "w": 4,
+        "h": 2
+      }
+    },
+    {
+      "title": "Slow Operations (>1s)",
+      "type": "table",
+      "query": "level:warning message:\"Slow operation\"",
+      "displayType": "table",
+      "columns": ["context", "operation", "duration"],
+      "position": {
+        "x": 0,
+        "y": 4,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "title": "Recent Errors",
+      "type": "table",
+      "query": "level:error",
+      "displayType": "table",
+      "columns": ["message", "context", "timestamp"],
+      "limit": 10,
+      "position": {
+        "x": 6,
+        "y": 4,
+        "w": 6,
+        "h": 3
+      }
+    }
+  ],
+  "alerts": [
+    {
+      "name": "High Error Rate",
+      "condition": "error_rate > 5%",
+      "window": "5m",
+      "threshold": 5,
+      "actions": ["email", "slack"]
+    },
+    {
+      "name": "Health Check Failure",
+      "condition": "health_check_status != healthy",
+      "window": "2m",
+      "actions": ["email", "pagerduty"]
+    },
+    {
+      "name": "OAuth Failures",
+      "condition": "oauth_success_rate < 90%",
+      "window": "10m",
+      "threshold": 90,
+      "actions": ["email"]
+    },
+    {
+      "name": "High Memory Usage",
+      "condition": "memory_percentage > 85%",
+      "window": "5m",
+      "threshold": 85,
+      "actions": ["email", "slack"]
+    },
+    {
+      "name": "Slow API Response",
+      "condition": "p95_response_time > 2000ms",
+      "window": "5m",
+      "threshold": 2000,
+      "actions": ["email"]
+    }
+  ]
+}
