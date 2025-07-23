@@ -1,14 +1,14 @@
 // Onboarding Metrics API - Performance monitoring and analytics
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '../../../../lib/auth'
-import { OnboardingMonitoring } from '../../../../lib/onboarding/monitoring'
+import { withAuth } from '@/lib/auth'
+import { OnboardingMonitoring } from '@/lib/onboarding/monitoring'
 
 // Auto-generate response types for client use
 export type OnboardingMetricsResponse = Awaited<ReturnType<typeof getOnboardingMetrics>>
 
-export const GET = withAuth(async (request: NextRequest) => {
+export const GET = withAuth(async (_request) => {
   // Only allow admin users to view metrics
-  const { user } = request.auth
+  // const { user } = _request.auth // TODO: Add admin check when needed
   
   try {
     const result = await getOnboardingMetrics()

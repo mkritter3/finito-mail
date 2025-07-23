@@ -55,10 +55,20 @@ export function useAuth() {
     }
   }
 
-  const logout = () => {
+  const logout = async () => {
+    // Clear all auth tokens
+    localStorage.removeItem('finito_auth_token')
     localStorage.removeItem('gmail_access_token')
     localStorage.removeItem('gmail_refresh_token')
     localStorage.removeItem('gmail_token_expires')
+    
+    // Call logout API (optional, for server-side cleanup)
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch (error) {
+      console.error('Logout API error:', error)
+    }
+    
     setIsAuthenticated(false)
     setProvider(null)
     router.push('/auth')

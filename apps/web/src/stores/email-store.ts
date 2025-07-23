@@ -27,6 +27,8 @@ interface EmailStore {
   provider: 'gmail' | 'outlook' | null
   optimisticUpdates: Map<string, OptimisticUpdate>
   bulkActionInProgress: boolean
+  emails: EmailMetadata[]
+  syncStatus: 'idle' | 'syncing' | 'error'
   
   setSelectedEmail: (id: string | null) => void
   setSelectedEmailId: (id: string | null) => void
@@ -40,6 +42,13 @@ interface EmailStore {
   clearOptimisticUpdates: () => void
   setBulkActionInProgress: (inProgress: boolean) => void
   getEmailWithOptimisticUpdates: (email: EmailMetadata) => EmailMetadata
+  
+  // Real-time sync methods
+  addEmail: (email: EmailMetadata) => void
+  updateEmail: (id: string, updates: Partial<EmailMetadata>) => void
+  removeEmail: (id: string) => void
+  setEmails: (emails: EmailMetadata[]) => void
+  setSyncStatus: (status: 'idle' | 'syncing' | 'error') => void
 }
 
 export const useEmailStore = create<EmailStore>((set, get) => ({
@@ -50,6 +59,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   provider: null,
   optimisticUpdates: new Map(),
   bulkActionInProgress: false,
+  emails: [],
+  syncStatus: 'idle',
   
   setSelectedEmail: (id) => set({ selectedEmailId: id }),
   
@@ -99,5 +110,24 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       return { ...email, ...update.updates }
     }
     return email
-  }
+  },
+  
+  // Real-time sync methods
+  addEmail: (email) => set((state) => ({
+    emails: [email, ...state.emails]
+  })),
+  
+  updateEmail: (id, updates) => set((state) => ({
+    emails: state.emails.map(email => 
+      email.gmail_message_id === id ? { ...email, ...updates } : email
+    )
+  })),
+  
+  removeEmail: (id) => set((state) => ({
+    emails: state.emails.filter(email => email.gmail_message_id !== id)
+  })),
+  
+  setEmails: (emails) => set({ emails }),
+  
+  setSyncStatus: (syncStatus) => set({ syncStatus })
 }))

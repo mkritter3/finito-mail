@@ -1,18 +1,18 @@
 // Bulk Rules Operations API - Following inbox-zero patterns
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '../../../../lib/auth'
-import { RulesEngineService } from '../../../../lib/rules-engine/service'
+import { withAuth } from '@/lib/auth'
+import { RulesEngineService } from '@/lib/rules-engine/service'
 import { GmailClientEnhanced } from '@finito/provider-client'
 import { 
   bulkRuleOperationSchema,
   type BulkRuleOperationBody
-} from '../../../../lib/rules-engine/validation'
+} from '@/lib/rules-engine/validation'
 import { ZodError } from 'zod'
 
 // Auto-generate response types for client use
 export type BulkRuleOperationResponse = Awaited<ReturnType<typeof bulkRuleOperation>>
 
-export const POST = withAuth(async (request: NextRequest) => {
+export const POST = withAuth(async (request) => {
   const { user } = request.auth
   
   try {
@@ -62,7 +62,10 @@ async function bulkRuleOperation({
   // Validate request body
   const validatedData = bulkRuleOperationSchema.parse(body)
   
-  const gmailClient = new GmailClientEnhanced()
+  const gmailClient = new GmailClientEnhanced({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  })
   const rulesService = new RulesEngineService(gmailClient)
   
   const results = {

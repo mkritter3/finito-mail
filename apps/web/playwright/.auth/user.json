@@ -6,19 +6,19 @@
       "localStorage": [
         {
           "name": "gmail_token_expires",
-          "value": "1752880904334"
+          "value": "1753249139646"
         },
         {
           "name": "finito_auth_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImUyZS50ZXN0QGV4YW1wbGUuY29tIiwibmFtZSI6IkUyRSBUZXN0IFVzZXIiLCJpZCI6ImUyZV90ZXN0X3VzZXJfMTIzIiwicGljdHVyZSI6Imh0dHBzOi8vdmlhLnBsYWNlaG9sZGVyLmNvbS8xNTAiLCJ2ZXJpZmllZF9lbWFpbCI6dHJ1ZSwiaXNNb2NrVXNlciI6dHJ1ZSwiY3JlYXRlZEF0IjoxNzUyODc3MzA0MzMyLCJpYXQiOjE3NTI4NzczMDQsImV4cCI6MTc1Mjg4MDkwNCwiYXVkIjoiZmluaXRvLW1haWwtYXBwIiwiaXNzIjoiZmluaXRvLW1haWwtdGVzdCJ9.0vGSLb5UWJdZe9fRAYbRPDdmJwZHq8i5gZZ9npKGn5A"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlMmVfdGVzdF91c2VyXzEyMyIsImVtYWlsIjoiZTJlLnRlc3RAZXhhbXBsZS5jb20iLCJuYW1lIjoiRTJFIFRlc3QgVXNlciIsInBpY3R1cmUiOiJodHRwczovL3ZpYS5wbGFjZWhvbGRlci5jb20vMTUwIiwidmVyaWZpZWRfZW1haWwiOnRydWUsImlzTW9ja1VzZXIiOnRydWUsImNyZWF0ZWRBdCI6MTc1MzI0NTUzOTY0NCwiaWF0IjoxNzUzMjQ1NTM5LCJleHAiOjE3NTMyNDkxMzksImF1ZCI6ImZpbml0by1tYWlsLWFwcCIsImlzcyI6ImZpbml0by1tYWlsLXRlc3QifQ.JKKkmpaMygn86TZXD9L9gpMcj-n43jIhT48zsf_Q2iU"
         },
         {
           "name": "gmail_refresh_token",
-          "value": "mock_refresh_1752877304334"
+          "value": "mock_refresh_1753245539646"
         },
         {
           "name": "gmail_access_token",
-          "value": "mock_gmail_1752877304334_e2e.test_at_example.com"
+          "value": "mock_gmail_1753245539646_e2e.test_at_example.com"
         }
       ]
     }

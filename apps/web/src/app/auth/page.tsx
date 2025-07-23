@@ -36,6 +36,9 @@ function AuthPageContent() {
           } else {
             // Token is invalid, remove it
             localStorage.removeItem('finito_auth_token')
+            localStorage.removeItem('gmail_access_token')
+            localStorage.removeItem('gmail_refresh_token')
+            localStorage.removeItem('gmail_token_expires')
           }
         }
       } catch (error) {

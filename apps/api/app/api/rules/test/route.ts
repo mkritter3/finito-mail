@@ -1,18 +1,18 @@
 // Rule Testing API - Test rules against emails
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '../../../../lib/auth'
-import { RulesEngineService } from '../../../../lib/rules-engine/service'
+import { withAuth } from '@/lib/auth'
+import { RulesEngineService } from '@/lib/rules-engine/service'
 import { GmailClientEnhanced } from '@finito/provider-client'
 import { 
   ruleTestSchema,
   type RuleTestBody
-} from '../../../../lib/rules-engine/validation'
+} from '@/lib/rules-engine/validation'
 import { ZodError } from 'zod'
 
 // Auto-generate response types for client use
 export type RuleTestResponse = Awaited<ReturnType<typeof testRule>>
 
-export const POST = withAuth(async (request: NextRequest) => {
+export const POST = withAuth(async (request) => {
   const { user } = request.auth
   
   try {
@@ -62,7 +62,10 @@ async function testRule({
   // Validate request body
   const validatedData = ruleTestSchema.parse(body)
   
-  const gmailClient = new GmailClientEnhanced()
+  const gmailClient = new GmailClientEnhanced({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  })
   const rulesService = new RulesEngineService(gmailClient)
   
   const result = await rulesService.testRule(userId, validatedData)

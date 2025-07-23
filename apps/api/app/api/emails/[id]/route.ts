@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
-import { IntelligentContentFetcher } from '../../../lib/intelligent-content-fetcher';
+import { IntelligentContentFetcher } from '@/lib/intelligent-content-fetcher';
 import { emailCache } from '@/lib/email-cache';
 
 // Initialize intelligent content fetcher

@@ -6,7 +6,12 @@
         "name": "next"
       }
     ],
-    "allowJs": true
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/lib/*": ["lib/*"],
+      "@/*": ["./*"]
+    }
   },
   "include": [
     "next-env.d.ts",

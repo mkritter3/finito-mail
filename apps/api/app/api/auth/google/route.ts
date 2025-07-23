@@ -5,7 +5,7 @@ import { randomBytes } from 'crypto';
 /**
  * GET /api/auth/google - Start Google OAuth flow with CSRF protection
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID!,

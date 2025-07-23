@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db-pool";
+import { dbPool as db } from "@/lib/db-pool";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   // Check database connectivity (isolated check)
   try {
     const dbStart = Date.now();
-    const dbResult = await db.query("SELECT 1 as health");
+    await db.query("SELECT 1 as health");
     const dbLatency = Date.now() - dbStart;
     
     checks.push({
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 
     checks.push({
       service: "email_sync",
-      status: recentActivity.rowCount > 0 ? "healthy" : "degraded",
+      status: (recentActivity.rowCount ?? 0) > 0 ? "healthy" : "degraded",
     });
   } catch (error) {
     checks.push({

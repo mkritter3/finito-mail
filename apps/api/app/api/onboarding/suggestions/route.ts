@@ -1,14 +1,14 @@
 // Onboarding Suggestions API - "Instant Triage" feature
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '../../../../lib/auth'
-import { PatternAnalysisWorker } from '../../../../lib/onboarding/pattern-analysis-worker'
-import { dbPool } from '../../../../lib/db-pool'
+import { withAuth } from '@/lib/auth'
+import { PatternAnalysisWorker } from '@/lib/onboarding/pattern-analysis-worker'
+import { dbPool } from '@/lib/db-pool'
 
 // Auto-generate response types for client use
 export type OnboardingSuggestionsResponse = Awaited<ReturnType<typeof getOnboardingSuggestions>>
 export type TriggerAnalysisResponse = Awaited<ReturnType<typeof triggerPatternAnalysis>>
 
-export const GET = withAuth(async (request: NextRequest) => {
+export const GET = withAuth(async (request) => {
   const { user } = request.auth
   
   try {
@@ -23,7 +23,7 @@ export const GET = withAuth(async (request: NextRequest) => {
   }
 })
 
-export const POST = withAuth(async (request: NextRequest) => {
+export const POST = withAuth(async (request) => {
   const { user } = request.auth
   
   try {

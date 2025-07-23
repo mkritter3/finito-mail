@@ -1,0 +1,7 @@
+# nixpacks.toml - Railway deployment configuration
+
+[phases.build]
+cmds = ["npm ci", "npm run build"]
+
+[start]
+cmd = "npm start"

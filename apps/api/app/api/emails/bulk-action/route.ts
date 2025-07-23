@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { withAuth } from '../../../lib/auth';
+import { withAuth } from '@/lib/auth';
 import { GmailClientEnhanced } from '@finito/provider-client';
-import { dbPool } from '../../../lib/db-pool';
-import { emailCache } from '../../../lib/email-cache';
-import { GmailBatchService, BatchAction } from '../../../lib/gmail-batch-service';
+import { dbPool } from '@/lib/db-pool';
+import { emailCache } from '@/lib/email-cache';
+import { GmailBatchService, BatchAction } from '@/lib/gmail-batch-service';
 
 const gmailClient = new GmailClientEnhanced({
   clientId: process.env.GOOGLE_CLIENT_ID!,

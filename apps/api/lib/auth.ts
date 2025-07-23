@@ -11,6 +11,9 @@ export interface AuthenticatedUser {
 
 export interface AuthenticatedRequest extends NextRequest {
   user: AuthenticatedUser;
+  auth: {
+    user: AuthenticatedUser;
+  };
 }
 
 // Database client
@@ -24,10 +27,10 @@ const getDbClient = () => {
 /**
  * Authentication middleware for API routes
  */
-export async function withAuth<T extends any[]>(
-  handler: (request: AuthenticatedRequest, ...args: T) => Promise<Response>
+export function withAuth(
+  handler: (request: AuthenticatedRequest, context?: any) => Promise<Response>
 ) {
-  return async (request: NextRequest, ...args: T): Promise<Response> => {
+  return async (request: NextRequest, context?: any): Promise<Response> => {
     try {
       // Get token from Authorization header
       const authHeader = request.headers.get('Authorization');
@@ -65,8 +68,9 @@ export async function withAuth<T extends any[]>(
       
       // Attach user to request
       (request as AuthenticatedRequest).user = user;
+      (request as AuthenticatedRequest).auth = { user };
       
-      return handler(request as AuthenticatedRequest, ...args);
+      return handler(request as AuthenticatedRequest, context);
     } catch (error) {
       console.error('Authentication error:', error);
       return new Response(

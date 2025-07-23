@@ -1,21 +1,21 @@
 // Rules Management API - Following inbox-zero patterns
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '../../../lib/auth'
-import { RulesEngineService } from '../../../lib/rules-engine/service'
+import { withAuth } from '@/lib/auth'
+import { RulesEngineService } from '@/lib/rules-engine/service'
 import { GmailClientEnhanced } from '@finito/provider-client'
 import { 
   createRuleSchema, 
   updateRuleSchema,
   type CreateRuleBody,
   type UpdateRuleBody
-} from '../../../lib/rules-engine/validation'
+} from '@/lib/rules-engine/validation'
 import { ZodError } from 'zod'
 
 // Auto-generate response types for client use
 export type GetRulesResponse = Awaited<ReturnType<typeof getRules>>
 export type CreateRuleResponse = Awaited<ReturnType<typeof createRule>>
 
-export const GET = withAuth(async (request: NextRequest) => {
+export const GET = withAuth(async (request) => {
   const { user } = request.auth
   
   try {
@@ -39,7 +39,7 @@ export const GET = withAuth(async (request: NextRequest) => {
   }
 })
 
-export const POST = withAuth(async (request: NextRequest) => {
+export const POST = withAuth(async (request) => {
   const { user } = request.auth
   
   try {
@@ -96,7 +96,10 @@ async function getRules({
   enabledOnly?: boolean
   systemType?: string | null
 }) {
-  const gmailClient = new GmailClientEnhanced()
+  const gmailClient = new GmailClientEnhanced({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  })
   const rulesService = new RulesEngineService(gmailClient)
   
   let rules = await rulesService.getUserRules(userId, enabledOnly)
@@ -131,7 +134,10 @@ async function createRule({
   // Validate request body
   const validatedData = createRuleSchema.parse(body)
   
-  const gmailClient = new GmailClientEnhanced()
+  const gmailClient = new GmailClientEnhanced({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  })
   const rulesService = new RulesEngineService(gmailClient)
   
   const rule = await rulesService.createRule(userId, validatedData)

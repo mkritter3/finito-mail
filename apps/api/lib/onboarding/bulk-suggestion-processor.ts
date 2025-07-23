@@ -243,7 +243,10 @@ export class BulkSuggestionProcessor {
    * Static method to process a bulk suggestion (for async worker integration)
    */
   static async processBulkSuggestion(actionId: string): Promise<ProcessingResult> {
-    const gmailClient = new GmailClientEnhanced()
+    const gmailClient = new GmailClientEnhanced({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    })
     const processor = new BulkSuggestionProcessor(gmailClient)
     return await processor.processBulkSuggestion(actionId)
   }

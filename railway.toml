@@ -1,15 +1,11 @@
-# railway.toml - Monorepo deployment configuration
+# railway.toml - Monorepo deployment configuration for Railway
 
 [build]
-# Use Nixpacks for automatic Node.js detection and optimization
 builder = "nixpacks"
-# Build only the web app and its dependencies using Turbo
-buildCommand = "npm install && npx turbo build --filter=@finito/web"
+buildCommand = "npm ci && npx turbo build --filter=@finito/web"
 
 [deploy]
-# Start the web application with explicit port binding for Railway
-startCommand = "cd apps/web && npx next start -p $PORT"
-# Railway will automatically handle restarts on failure
+startCommand = "cd apps/web && npm start"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 

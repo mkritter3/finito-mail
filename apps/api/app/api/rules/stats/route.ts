@@ -1,13 +1,13 @@
 // Rule Statistics API - Performance monitoring and analytics
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '../../../../lib/auth'
-import { RulesEngineService } from '../../../../lib/rules-engine/service'
+import { withAuth } from '@/lib/auth'
+import { RulesEngineService } from '@/lib/rules-engine/service'
 import { GmailClientEnhanced } from '@finito/provider-client'
 
 // Auto-generate response types for client use
 export type RuleStatsResponse = Awaited<ReturnType<typeof getRuleStats>>
 
-export const GET = withAuth(async (request: NextRequest) => {
+export const GET = withAuth(async (request) => {
   const { user } = request.auth
   
   try {
@@ -40,7 +40,10 @@ async function getRuleStats({
   timeRange: string
   ruleId?: string | null
 }) {
-  const gmailClient = new GmailClientEnhanced()
+  const gmailClient = new GmailClientEnhanced({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  })
   const rulesService = new RulesEngineService(gmailClient)
   
   // Get time range in milliseconds

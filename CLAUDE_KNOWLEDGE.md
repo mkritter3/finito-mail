@@ -513,3 +513,129 @@ All 61 tests now passing across all browsers (Chrome, Firefox, Safari/WebKit) an
 **Don't declare victory prematurely on critical infrastructure.** Authentication requires 100% reliability. The 36% failure rate represents real bugs that would affect users in production.
 
 **Last Knowledge Update**: 2025-01-23 - Reality check on OAuth testing standards and current gaps.
+
+## 🚨 Production Monitoring Implementation (LEARNED 2025-01-23)
+
+### Sentry APM Integration Complete
+Successfully implemented comprehensive monitoring infrastructure with Sentry APM:
+
+**✅ IMPLEMENTED FEATURES:**
+1. **Client-Side Monitoring** (`sentry.client.config.ts`)
+   - Error tracking with source maps
+   - Session replay with PII masking
+   - Performance monitoring (10% sampling)
+   - Breadcrumb tracking
+
+2. **Server-Side Monitoring** (`sentry.server.config.ts`)
+   - API route instrumentation
+   - Database query tracking
+   - Custom performance metrics
+   - Error context enrichment
+
+3. **Edge Runtime Support** (`sentry.edge.config.ts`)
+   - Middleware performance tracking
+   - Edge function error handling
+   - Reduced bundle for edge runtime
+
+4. **Health Check Endpoint** (`/api/health`)
+   - Database connectivity check
+   - Redis availability check
+   - Gmail API status
+   - Memory usage metrics
+   - Timing-safe API key comparison
+
+5. **Enhanced Logger** (`lib/logger.ts`)
+   - Pino + Sentry integration
+   - Performance timing helpers
+   - Structured logging with context
+   - Sensitive data redaction
+
+### Security Fixes Applied (FROM GEMINI REVIEW)
+1. **Timing Attack Prevention** - Used crypto.timingSafeEqual for API key comparison
+2. **PII Protection** - Enabled maskAllText and blockAllMedia in session replays
+3. **APM Best Practices** - Fixed transaction/span anti-patterns
+4. **Resource Optimization** - Module-level client reuse
+5. **Memory Monitoring** - Custom metrics with Sentry.setMeasurement
+
+### Configuration Requirements
+```env
+NEXT_PUBLIC_SENTRY_DSN=your-sentry-dsn
+SENTRY_DSN=your-sentry-dsn
+SENTRY_ORG=your-org-slug
+SENTRY_PROJECT=finito-mail
+SENTRY_AUTH_TOKEN=your-auth-token
+HEALTH_CHECK_API_KEY=secure-random-key
+```
+
+### Monitoring Dashboard Created
+- Error rate tracking
+- API performance (p95, p99)
+- Memory usage patterns
+- Slow operation detection
+- Authentication success rates
+
+**Last Knowledge Update**: 2025-01-23 - Completed performance monitoring implementation with security hardening.
+
+## 🔄 Real-Time Sync Implementation (LEARNED 2025-01-23)
+
+### Architecture Implemented
+Successfully created hybrid real-time sync system with multiple fallback layers:
+
+**✅ COMPLETED COMPONENTS:**
+
+1. **Webhook Endpoint** (`/api/webhooks/gmail`)
+   - Receives Gmail Push notifications via Pub/Sub
+   - Timing-safe token verification
+   - Processes history changes incrementally
+   - Updates connected SSE clients
+
+2. **SSE Endpoint** (`/api/sse/email-updates`)
+   - Server-Sent Events for real-time streaming
+   - Per-user connection management
+   - Heartbeat keep-alive (30s intervals)
+   - Automatic cleanup on disconnect
+
+3. **Client Hooks**
+   - `use-email-updates.ts` - SSE connection management
+   - `use-fallback-polling.ts` - Polling when SSE fails
+   - `use-real-time-sync.ts` - Combined SSE + fallback logic
+
+4. **Gmail Watch Registration** (`/api/gmail/watch`)
+   - Sets up Gmail Push notifications
+   - Stores watch details with expiration
+   - Automatic renewal scheduling
+
+### Key Implementation Details
+
+**Webhook Processing Flow:**
+```
+Gmail → Pub/Sub → Webhook → Process History → SSE → Client
+                     ↓
+                  Database
+```
+
+**Security Measures:**
+- Pub/Sub token verification with timing-safe comparison
+- Session-based authentication for SSE
+- Rate limiting on webhook endpoint
+- Idempotency handling for notifications
+
+**Client Resilience:**
+- Automatic reconnection with exponential backoff
+- Page visibility API integration
+- Heartbeat timeout detection
+- Fallback to polling after 10s of no activity
+
+### Integration Points
+- Updated email store with real-time methods
+- Gmail history API integration
+- Database sync status tracking
+- Client notification system (toast messages)
+
+### Remaining Tasks
+1. **Gmail Push Setup** - Configure Pub/Sub topic and subscription
+2. **Environment Variables** - Add PUBSUB_VERIFICATION_TOKEN and GMAIL_PUBSUB_TOPIC
+3. **Database Schema** - Add gmailWatch and syncStatus tables
+4. **End-to-End Testing** - Verify complete flow from Gmail to client
+
+**Last Knowledge Update**: 2025-01-23 - Completed real-time sync implementation with SSE and webhook infrastructure.

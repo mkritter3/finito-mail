@@ -1,11 +1,11 @@
 // Reject onboarding suggestion API - Mark suggestion as rejected
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '../../../../../lib/auth'
-import { dbPool } from '../../../../../lib/db-pool'
+import { withAuth } from '@/lib/auth'
+import { dbPool } from '@/lib/db-pool'
 
-export const POST = withAuth(async (request: NextRequest) => {
+export const POST = withAuth(async (request, { params }: { params: { id: string } }) => {
   const { user } = request.auth
-  const { id } = request.params
+  const { id } = params
 
   try {
     const result = await rejectSuggestion(id, user.id)
@@ -20,11 +20,7 @@ export const POST = withAuth(async (request: NextRequest) => {
 })
 
 async function rejectSuggestion(suggestionId: string, userId: string) {
-  const client = await dbPool.connect()
-  
-  try {
-    await client.query('BEGIN')
-    
+  return await dbPool.transaction(async (client) => {
     // Update suggestion status to rejected
     const updateResult = await client.query(
       `UPDATE onboarding_suggestions 
@@ -38,16 +34,9 @@ async function rejectSuggestion(suggestionId: string, userId: string) {
       throw new Error('Suggestion not found or already processed')
     }
     
-    await client.query('COMMIT')
-    
     return {
       success: true,
       message: 'Suggestion rejected successfully'
     }
-  } catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  } finally {
-    client.release()
-  }
+  })
 }

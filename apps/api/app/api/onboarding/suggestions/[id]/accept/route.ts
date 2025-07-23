@@ -1,14 +1,14 @@
 // Accept Onboarding Suggestion API - Atomic rule creation and email processing
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '../../../../../../lib/auth'
-import { RulesEngineService } from '../../../../../../lib/rules-engine/service'
+import { withAuth } from '@/lib/auth'
+import { RulesEngineService } from '@/lib/rules-engine/service'
 import { GmailClientEnhanced } from '@finito/provider-client'
-import { dbPool } from '../../../../../../lib/db-pool'
+import { dbPool } from '@/lib/db-pool'
 
 // Auto-generate response types for client use
 export type AcceptSuggestionResponse = Awaited<ReturnType<typeof acceptSuggestion>>
 
-export const POST = withAuth(async (request: NextRequest, { params }: { params: { id: string } }) => {
+export const POST = withAuth(async (request, { params }: { params: { id: string } }) => {
   const { user } = request.auth
   const { id: suggestionId } = params
   
@@ -48,11 +48,8 @@ async function acceptSuggestion({
   userId: string
   suggestionId: string 
 }) {
-  // Start transaction
-  const client = await dbPool.connect()
-  
-  try {
-    await client.query('BEGIN')
+  // Use transaction method from dbPool
+  return await dbPool.transaction(async (client) => {
     
     // 1. Find and validate the suggestion
     const suggestionResult = await client.query(
@@ -73,7 +70,10 @@ async function acceptSuggestion({
     }
     
     // 2. Create the rule using the rules engine
-    const gmailClient = new GmailClientEnhanced()
+    const gmailClient = new GmailClientEnhanced({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    })
     const rulesService = new RulesEngineService(gmailClient)
     
     const ruleData = {
@@ -81,6 +81,7 @@ async function acceptSuggestion({
       description: generateRuleDescription(suggestion.suggestion_type, suggestion.pattern_data),
       conditions: suggestion.suggested_action.conditions,
       actions: suggestion.suggested_action.actions,
+      priority: 1, // Default priority for auto-generated rules
       enabled: true
     }
     
@@ -112,8 +113,6 @@ async function acceptSuggestion({
       ]
     )
     
-    await client.query('COMMIT')
-    
     console.log(`✅ Accepted suggestion ${suggestionId} for user ${userId}: created rule ${createdRule.id}`)
     
     return {
@@ -128,13 +127,7 @@ async function acceptSuggestion({
       suggestion_type: suggestion.suggestion_type,
       pattern_data: suggestion.pattern_data
     }
-    
-  } catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  } finally {
-    client.release()
-  }
+  })
 }
 
 /**

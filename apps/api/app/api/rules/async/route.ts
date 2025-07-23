@@ -1,14 +1,14 @@
 // Async Rules Processing API - Background processing for slow actions
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '../../../../lib/auth'
-import { AsyncRuleProcessor } from '../../../../lib/rules-engine/async-processor'
+import { withAuth } from '@/lib/auth'
+import { AsyncRuleProcessor } from '@/lib/rules-engine/async-processor'
 import { GmailClientEnhanced } from '@finito/provider-client'
 
 // Auto-generate response types for client use
 export type AsyncProcessingResponse = Awaited<ReturnType<typeof processAsyncActions>>
 export type AsyncStatsResponse = Awaited<ReturnType<typeof getAsyncStats>>
 
-export const POST = withAuth(async (request: NextRequest) => {
+export const POST = withAuth(async (request) => {
   const { user } = request.auth
   
   try {
@@ -23,7 +23,7 @@ export const POST = withAuth(async (request: NextRequest) => {
   }
 })
 
-export const GET = withAuth(async (request: NextRequest) => {
+export const GET = withAuth(async (request) => {
   const { user } = request.auth
   
   try {
@@ -38,8 +38,12 @@ export const GET = withAuth(async (request: NextRequest) => {
   }
 })
 
-async function processAsyncActions({ userId }: { userId: string }) {
-  const gmailClient = new GmailClientEnhanced()
+async function processAsyncActions({ userId: _userId }: { userId: string }) {
+  // Note: userId may be used in future for user-specific processing
+  const gmailClient = new GmailClientEnhanced({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  })
   const processor = new AsyncRuleProcessor(gmailClient)
   
   const result = await processor.processPendingActions()
@@ -56,8 +60,12 @@ async function processAsyncActions({ userId }: { userId: string }) {
   }
 }
 
-async function getAsyncStats({ userId }: { userId: string }) {
-  const gmailClient = new GmailClientEnhanced()
+async function getAsyncStats({ userId: _userId }: { userId: string }) {
+  // Note: userId may be used in future for user-specific stats
+  const gmailClient = new GmailClientEnhanced({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  })
   const processor = new AsyncRuleProcessor(gmailClient)
   
   const stats = await processor.getStats()

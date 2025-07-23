@@ -1,20 +1,20 @@
 // Individual Rule Management API - Following inbox-zero patterns
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '../../../../lib/auth'
-import { RulesEngineService } from '../../../../lib/rules-engine/service'
+import { withAuth } from '@/lib/auth'
+import { RulesEngineService } from '@/lib/rules-engine/service'
 import { GmailClientEnhanced } from '@finito/provider-client'
 import { 
   updateRuleSchema, 
   deleteRuleSchema,
   type UpdateRuleBody 
-} from '../../../../lib/rules-engine/validation'
+} from '@/lib/rules-engine/validation'
 import { ZodError } from 'zod'
 
 // Auto-generate response types for client use
 export type GetRuleResponse = Awaited<ReturnType<typeof getRule>>
 export type UpdateRuleResponse = Awaited<ReturnType<typeof updateRule>>
 
-export const GET = withAuth(async (request: NextRequest, { params }: { params: { id: string } }) => {
+export const GET = withAuth(async (request, { params }: { params: { id: string } }) => {
   const { user } = request.auth
   const { id } = params
   
@@ -38,7 +38,7 @@ export const GET = withAuth(async (request: NextRequest, { params }: { params: {
   }
 })
 
-export const PUT = withAuth(async (request: NextRequest, { params }: { params: { id: string } }) => {
+export const PUT = withAuth(async (request, { params }: { params: { id: string } }) => {
   const { user } = request.auth
   const { id } = params
   
@@ -86,7 +86,7 @@ export const PUT = withAuth(async (request: NextRequest, { params }: { params: {
   }
 })
 
-export const DELETE = withAuth(async (request: NextRequest, { params }: { params: { id: string } }) => {
+export const DELETE = withAuth(async (request, { params }: { params: { id: string } }) => {
   const { user } = request.auth
   const { id } = params
   
@@ -118,7 +118,10 @@ async function getRule({
   userId: string
   ruleId: string
 }) {
-  const gmailClient = new GmailClientEnhanced()
+  const gmailClient = new GmailClientEnhanced({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  })
   const rulesService = new RulesEngineService(gmailClient)
   
   const rule = await rulesService.getRule(userId, ruleId)
@@ -153,7 +156,10 @@ async function updateRule({
   // Validate request body
   const validatedData = updateRuleSchema.parse(body)
   
-  const gmailClient = new GmailClientEnhanced()
+  const gmailClient = new GmailClientEnhanced({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  })
   const rulesService = new RulesEngineService(gmailClient)
   
   const rule = await rulesService.updateRule(userId, ruleId, validatedData)
@@ -174,7 +180,10 @@ async function deleteRule({
   // Validate request parameters
   deleteRuleSchema.parse({ rule_id: ruleId })
   
-  const gmailClient = new GmailClientEnhanced()
+  const gmailClient = new GmailClientEnhanced({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  })
   const rulesService = new RulesEngineService(gmailClient)
   
   await rulesService.deleteRule(userId, ruleId)

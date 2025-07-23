@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { withAuth } from '../../lib/auth';
-import { Client } from 'pg';
-import { EmailSyncService } from '../../lib/email-sync';
-import { dbPool } from '../../lib/db-pool';
-import { emailCache } from '../../lib/email-cache';
+import { withAuth } from '@/lib/auth';
+import { EmailSyncService } from '@/lib/email-sync';
+import { dbPool } from '@/lib/db-pool';
+import { emailCache } from '@/lib/email-cache';
 
 const emailQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(50),
@@ -48,7 +47,7 @@ export const GET = withAuth(async (request) => {
         WHERE user_id = $1
       `;
       
-      const params = [userId];
+      const params: any[] = [userId];
       let paramIndex = 2;
       
       // Apply filters
@@ -86,6 +85,8 @@ export const GET = withAuth(async (request) => {
       await emailCache.cacheEmailList(userId, query, result.rows);
       
       return NextResponse.json({ emails: result.rows, cached: false });
+    } catch (error) {
+      throw error; // Re-throw to be caught by the outer catch
     }
   } catch (error) {
     console.error('Email fetch error:', error);

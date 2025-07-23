@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client } from 'pg';
-import { EmailSyncService } from '../../../../lib/email-sync';
-import { RulesEngineService } from '../../../../lib/rules-engine/service';
-import { PatternAnalysisWorker } from '../../../../lib/onboarding/pattern-analysis-worker';
+import { EmailSyncService } from '@/lib/email-sync';
+import { RulesEngineService } from '@/lib/rules-engine/service';
+import { PatternAnalysisWorker } from '@/lib/onboarding/pattern-analysis-worker';
 import { GmailClientEnhanced } from '@finito/provider-client';
 import { z } from 'zod';
 
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { jobId, userId, timestamp } = syncJobSchema.parse(body);
+    const { jobId, userId } = syncJobSchema.parse(body);
 
     await dbClient.connect();
 
@@ -84,7 +84,10 @@ export async function POST(request: NextRequest) {
         }
         try {
           // Get Gmail client for rules processing
-          const gmailClient = new GmailClientEnhanced();
+          const gmailClient = new GmailClientEnhanced({
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+          });
           const rulesService = new RulesEngineService(gmailClient);
           
           // Get user's Google tokens
@@ -107,7 +110,7 @@ export async function POST(request: NextRequest) {
 
             // Get recently synced emails from database
             const emailsResult = await dbClient.query(
-              `SELECT gmail_message_id, subject, snippet, from_address, to_addresses, received_at, is_read, raw_gmail_metadata 
+              `SELECT gmail_message_id, gmail_thread_id, subject, snippet, from_address, to_addresses, received_at, is_read, raw_gmail_metadata 
                FROM email_metadata 
                WHERE user_id = $1 
                ORDER BY received_at DESC 
@@ -122,6 +125,7 @@ export async function POST(request: NextRequest) {
               try {
                 const emailContext = {
                   gmail_message_id: emailRow.gmail_message_id,
+                  gmail_thread_id: emailRow.gmail_thread_id,
                   subject: emailRow.subject || '',
                   snippet: emailRow.snippet || '',
                   from_address: emailRow.from_address,

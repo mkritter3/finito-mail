@@ -1,15 +1,15 @@
 // Onboarding Cleanup API - System maintenance and monitoring
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '../../../../lib/auth'
-import { OnboardingCleanupJob } from '../../../../lib/onboarding/cleanup-job'
+import { withAuth } from '@/lib/auth'
+import { OnboardingCleanupJob } from '@/lib/onboarding/cleanup-job'
 
 // Auto-generate response types for client use
 export type CleanupResponse = Awaited<ReturnType<typeof runCleanup>>
 export type CleanupStatsResponse = Awaited<ReturnType<typeof getCleanupStats>>
 
-export const POST = withAuth(async (request: NextRequest) => {
+export const POST = withAuth(async (_request) => {
   // Only allow admin users to trigger cleanup manually
-  const { user } = request.auth
+  // const { user } = _request.auth // TODO: Add admin check when needed
   
   try {
     const result = await runCleanup()
@@ -23,8 +23,8 @@ export const POST = withAuth(async (request: NextRequest) => {
   }
 })
 
-export const GET = withAuth(async (request: NextRequest) => {
-  const { user } = request.auth
+export const GET = withAuth(async (_request) => {
+  // const { user } = _request.auth // TODO: Add admin check when needed
   
   try {
     const result = await getCleanupStats()
