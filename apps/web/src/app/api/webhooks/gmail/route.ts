@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createScopedLogger } from '@/lib/logger'
 import * as Sentry from '@sentry/nextjs'
 import { createHmac, timingSafeEqual } from 'crypto'
-import { sendUpdateToUser, SSEMessageType } from '@/app/api/sse/email-updates/route'
+import { SSEMessageType } from '@/app/api/sse/email-updates/route'
+import { getPublisherClient } from '@/lib/redis-pubsub'
 import { prisma } from '@/lib/prisma'
 import { GmailClientEnhanced } from '@finito/provider-client'
 import { google } from 'googleapis'
@@ -52,8 +53,13 @@ function verifyPubSubSignature(request: NextRequest): boolean {
 // Process Gmail notification
 async function processGmailNotification(notification: GmailNotification) {
   const processTimer = logger.time('process-notification')
+  const publisher = getPublisherClient()
   
   try {
+    // Ensure Redis is connected
+    if (publisher.status !== 'ready') {
+      await publisher.connect()
+    }
     // Look up user by email address
     const account = await prisma.account.findFirst({
       where: {
@@ -113,12 +119,13 @@ async function processGmailNotification(notification: GmailNotification) {
               if (added.message?.id) {
                 const fullMessage = await gmailClient.getMessage(gmail, added.message.id)
                 
-                // Send SSE update
-                await sendUpdateToUser(account.userId, {
+                // Publish SSE update to Redis
+                const channel = `user:${account.userId}:updates`
+                await publisher.publish(channel, JSON.stringify({
                   type: SSEMessageType.NEW_EMAIL,
                   data: fullMessage,
                   timestamp: new Date().toISOString()
-                })
+                }))
               }
             }
           }
@@ -129,11 +136,11 @@ async function processGmailNotification(notification: GmailNotification) {
               if (modified.message?.id) {
                 const message = await gmailClient.getMessage(gmail, modified.message.id)
                 
-                await sendUpdateToUser(account.userId, {
+                await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
                   type: SSEMessageType.EMAIL_UPDATE,
                   data: message,
                   timestamp: new Date().toISOString()
-                })
+                }))
               }
             }
           }
@@ -142,11 +149,11 @@ async function processGmailNotification(notification: GmailNotification) {
           if (historyItem.messagesDeleted) {
             for (const deleted of historyItem.messagesDeleted) {
               if (deleted.message?.id) {
-                await sendUpdateToUser(account.userId, {
+                await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
                   type: SSEMessageType.EMAIL_DELETE,
                   data: { id: deleted.message.id },
                   timestamp: new Date().toISOString()
-                })
+                }))
               }
             }
           }
@@ -169,11 +176,11 @@ async function processGmailNotification(notification: GmailNotification) {
     })
     
     // Send sync complete notification
-    await sendUpdateToUser(account.userId, {
+    await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
       type: SSEMessageType.SYNC_COMPLETE,
       data: { historyId: notification.historyId },
       timestamp: new Date().toISOString()
-    })
+    }))
     
     processTimer.end({ status: 'success' })
   } catch (error) {

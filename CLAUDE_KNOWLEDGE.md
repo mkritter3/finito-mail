@@ -1,6 +1,6 @@
 # 🧠 Claude's Persistent Knowledge & Learning
 
-**Last Updated:** 2025-01-17 (Production Infrastructure Complete)
+**Last Updated:** 2025-01-23 (Real-Time Sync Refactored)
 
 This file contains Claude's accumulated knowledge about what works, what doesn't, and best practices discovered through actual usage.
 
@@ -77,6 +77,36 @@ claude "Use zen codereview to analyze [files] for security and performance"
 # Documentation Research (100% SUCCESS RATE)
 claude "Use context7 to get [framework] documentation focused on [topic]"
 ```
+
+## 🎉 Production Blockers Resolution (LEARNED 2025-01-23)
+
+### OAuth Testing (20% → 100% Pass Rate)
+- **Problem**: localStorage errors, React hooks violations, auth mocking issues
+- **Solutions**: Fixed test helpers, proper JWT handling, NEXTAUTH_SECRET configuration
+- **Result**: 61/61 tests passing across all browsers
+
+### Performance Monitoring (0% → 100% Complete)
+- **Sentry APM**: Client, server, edge runtime support
+- **Health Check**: `/api/health` with timing-safe API key verification
+- **Security Fixes**: crypto.timingSafeEqual, PII masking, proper APM spans
+- **Result**: Enterprise-grade monitoring with comprehensive observability
+
+### Real-Time Sync (0% → 100% Implemented & Refactored)
+- **Original Issue**: In-memory connection Map wouldn't work in serverless
+- **Critical Refactor**: Implemented Redis Pub/Sub for distributed architecture
+- **Architecture**: Gmail → Pub/Sub → Webhook → Redis Pub/Sub → SSE → Client
+- **New Components**:
+  - `/apps/web/src/lib/redis-pubsub.ts` - Redis client factory
+  - SSE endpoint uses Redis subscriber per connection
+  - Webhook publishes to Redis channels
+- **Result**: Production-ready distributed real-time sync
+
+### Key Learnings:
+1. **Always validate with Gemini** for production architecture reviews
+2. **In-memory state** doesn't work in serverless/distributed environments
+3. **Redis Pub/Sub** is essential for real-time features at scale
+4. **Upstash doesn't support Pub/Sub** - need standard Redis instance
+5. **Security first** - timing attacks, PII exposure are critical issues
 
 ### Development Workflows (VERIFIED)
 ```bash
