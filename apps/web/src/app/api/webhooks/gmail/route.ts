@@ -7,8 +7,18 @@ import { getPublisherClient } from '@/lib/redis-pubsub'
 import { prisma } from '@/lib/prisma'
 import { GmailClientEnhanced } from '@finito/provider-client'
 import { google } from 'googleapis'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
 
 const logger = createScopedLogger('webhook.gmail')
+
+// Initialize rate limiter
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(100, '60 s'), // 100 requests per minute
+  analytics: true,
+  prefix: '@upstash/ratelimit/webhook',
+})
 
 // Gmail Pub/Sub message format
 interface PubSubMessage {
@@ -119,13 +129,33 @@ async function processGmailNotification(notification: GmailNotification) {
               if (added.message?.id) {
                 const fullMessage = await gmailClient.getMessage(gmail, added.message.id)
                 
-                // Publish SSE update to Redis
+                // Publish SSE update to Redis with error handling
                 const channel = `user:${account.userId}:updates`
-                await publisher.publish(channel, JSON.stringify({
-                  type: SSEMessageType.NEW_EMAIL,
-                  data: fullMessage,
-                  timestamp: new Date().toISOString()
-                }))
+                try {
+                  await publisher.publish(channel, JSON.stringify({
+                    type: SSEMessageType.NEW_EMAIL,
+                    data: fullMessage,
+                    timestamp: new Date().toISOString()
+                  }))
+                  logger.debug('Published new email update', { 
+                    channel, 
+                    messageId: added.message.id 
+                  })
+                } catch (publishError) {
+                  logger.error(publishError instanceof Error ? publishError : new Error('Redis publish failed'), {
+                    context: 'new_email_publish',
+                    channel,
+                    messageId: added.message.id
+                  })
+                  Sentry.captureException(publishError, {
+                    tags: { 
+                      component: 'webhook',
+                      operation: 'redis_publish',
+                      messageType: 'new_email'
+                    }
+                  })
+                  // Continue processing - don't fail the webhook
+                }
               }
             }
           }
@@ -136,11 +166,26 @@ async function processGmailNotification(notification: GmailNotification) {
               if (modified.message?.id) {
                 const message = await gmailClient.getMessage(gmail, modified.message.id)
                 
-                await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
-                  type: SSEMessageType.EMAIL_UPDATE,
-                  data: message,
-                  timestamp: new Date().toISOString()
-                }))
+                try {
+                  await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
+                    type: SSEMessageType.EMAIL_UPDATE,
+                    data: message,
+                    timestamp: new Date().toISOString()
+                  }))
+                } catch (publishError) {
+                  logger.error(publishError instanceof Error ? publishError : new Error('Redis publish failed'), {
+                    context: 'email_update_publish',
+                    channel: `user:${account.userId}:updates`,
+                    messageId: modified.message.id
+                  })
+                  Sentry.captureException(publishError, {
+                    tags: { 
+                      component: 'webhook',
+                      operation: 'redis_publish',
+                      messageType: 'email_update'
+                    }
+                  })
+                }
               }
             }
           }
@@ -149,11 +194,26 @@ async function processGmailNotification(notification: GmailNotification) {
           if (historyItem.messagesDeleted) {
             for (const deleted of historyItem.messagesDeleted) {
               if (deleted.message?.id) {
-                await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
-                  type: SSEMessageType.EMAIL_DELETE,
-                  data: { id: deleted.message.id },
-                  timestamp: new Date().toISOString()
-                }))
+                try {
+                  await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
+                    type: SSEMessageType.EMAIL_DELETE,
+                    data: { id: deleted.message.id },
+                    timestamp: new Date().toISOString()
+                  }))
+                } catch (publishError) {
+                  logger.error(publishError instanceof Error ? publishError : new Error('Redis publish failed'), {
+                    context: 'email_delete_publish',
+                    channel: `user:${account.userId}:updates`,
+                    messageId: deleted.message.id
+                  })
+                  Sentry.captureException(publishError, {
+                    tags: { 
+                      component: 'webhook',
+                      operation: 'redis_publish',
+                      messageType: 'email_delete'
+                    }
+                  })
+                }
               }
             }
           }
@@ -176,11 +236,26 @@ async function processGmailNotification(notification: GmailNotification) {
     })
     
     // Send sync complete notification
-    await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
-      type: SSEMessageType.SYNC_COMPLETE,
-      data: { historyId: notification.historyId },
-      timestamp: new Date().toISOString()
-    }))
+    try {
+      await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
+        type: SSEMessageType.SYNC_COMPLETE,
+        data: { historyId: notification.historyId },
+        timestamp: new Date().toISOString()
+      }))
+    } catch (publishError) {
+      logger.error(publishError instanceof Error ? publishError : new Error('Redis publish failed'), {
+        context: 'sync_complete_publish',
+        channel: `user:${account.userId}:updates`
+      })
+      Sentry.captureException(publishError, {
+        tags: { 
+          component: 'webhook',
+          operation: 'redis_publish',
+          messageType: 'sync_complete'
+        }
+      })
+      // Don't fail the webhook - sync was still successful
+    }
     
     processTimer.end({ status: 'success' })
   } catch (error) {
@@ -197,6 +272,43 @@ export async function POST(request: NextRequest) {
   const timer = logger.time('process-gmail-webhook')
   
   try {
+    // Rate limiting check - use IP or fallback to 'anonymous'
+    const identifier = request.headers.get('x-forwarded-for') || 
+                      request.headers.get('x-real-ip') || 
+                      'anonymous'
+    
+    // Allow bypass for testing with custom header
+    const bypassToken = request.headers.get('x-ratelimit-bypass')
+    const shouldBypass = bypassToken === process.env.RATELIMIT_BYPASS_TOKEN
+    
+    if (!shouldBypass) {
+      const { success, limit, reset, remaining } = await ratelimit.limit(identifier)
+      
+      if (!success) {
+        logger.warn('Rate limit exceeded', { 
+          identifier, 
+          limit, 
+          remaining,
+          reset: new Date(reset).toISOString()
+        })
+        
+        timer.end({ status: 'rate_limited' })
+        
+        return NextResponse.json(
+          { error: 'Too Many Requests' },
+          { 
+            status: 429,
+            headers: {
+              'X-RateLimit-Limit': limit.toString(),
+              'X-RateLimit-Remaining': remaining.toString(),
+              'X-RateLimit-Reset': new Date(reset).toISOString(),
+              'Retry-After': Math.floor((reset - Date.now()) / 1000).toString(),
+            }
+          }
+        )
+      }
+    }
+    
     // Verify the request is from Google Pub/Sub
     if (!verifyPubSubSignature(request)) {
       logger.warn('Invalid Pub/Sub signature', {
