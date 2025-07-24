@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createScopedLogger, withLogging } from '@/lib/logger'
+import { setupGmailWatch } from '@/lib/gmail-watch'
+import { createClient } from '@supabase/supabase-js'
 
 // Force dynamic rendering - this route uses dynamic data (search params)
 export const dynamic = 'force-dynamic'
 
 const logger = createScopedLogger('auth.callback')
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!
+)
 
 export async function GET(request: NextRequest) {
   const timer = logger.time('oauth-callback')
@@ -88,16 +96,103 @@ export async function GET(request: NextRequest) {
       scopes: tokens.scope?.split(' ') || []
     })
 
+    // Get user info from Google
+    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${tokens.access_token}`
+      }
+    })
+    
+    if (!userInfoResponse.ok) {
+      logger.error('Failed to get user info')
+      timer.end({ status: 'user_info_failed' })
+      return NextResponse.redirect(new URL('/auth?error=user_info_failed', request.url))
+    }
+    
+    const userInfo = await userInfoResponse.json()
+    
+    // Create or update user in database
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .upsert({
+        email: userInfo.email,
+        name: userInfo.name,
+        image: userInfo.picture
+      }, {
+        onConflict: 'email'
+      })
+      .select()
+      .single()
+    
+    if (userError || !user) {
+      logger.error('Failed to create/update user', { error: userError })
+      timer.end({ status: 'user_creation_failed' })
+      return NextResponse.redirect(new URL('/auth?error=user_creation_failed', request.url))
+    }
+    
+    // Store account information
+    const { error: accountError } = await supabase
+      .from('accounts')
+      .upsert({
+        user_id: user.id,
+        provider: 'google',
+        provider_account_id: userInfo.email,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_at: tokens.expires_in ? Math.floor(Date.now() / 1000) + tokens.expires_in : null,
+        token_type: tokens.token_type,
+        scope: tokens.scope
+      }, {
+        onConflict: 'user_id,provider'
+      })
+    
+    if (accountError) {
+      logger.error('Failed to store account', { error: accountError })
+      timer.end({ status: 'account_storage_failed' })
+      return NextResponse.redirect(new URL('/auth?error=account_storage_failed', request.url))
+    }
+    
+    // Set up Gmail watch for real-time notifications
+    try {
+      const watchTimer = logger.time('gmail-watch-setup')
+      await setupGmailWatch({
+        userId: user.id,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresAt: tokens.expires_in ? Math.floor(Date.now() / 1000) + tokens.expires_in : undefined
+      })
+      watchTimer.end({ status: 'success' })
+      logger.info('Gmail watch setup completed', { userId: user.id })
+    } catch (watchError) {
+      // Don't fail the auth flow if watch setup fails
+      logger.error('Gmail watch setup failed', { error: watchError, userId: user.id })
+    }
+
     timer.end({ status: 'success' })
 
-    // Store tokens in a temporary location or return them to the frontend
-    // For now, let's redirect to a success page with tokens in URL params (not secure for production)
-    const successUrl = new URL('/auth/success', request.url)
-    successUrl.searchParams.set('access_token', tokens.access_token)
-    if (tokens.refresh_token) {
-      successUrl.searchParams.set('refresh_token', tokens.refresh_token)
+    // Create a session token
+    const sessionToken = Buffer.from(JSON.stringify({
+      userId: user.id,
+      email: user.email,
+      exp: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
+    })).toString('base64')
+    
+    // Store session
+    const { error: sessionError } = await supabase
+      .from('sessions')
+      .insert({
+        user_id: user.id,
+        session_token: sessionToken,
+        expires: new Date(Date.now() + (30 * 24 * 60 * 60 * 1000)).toISOString()
+      })
+    
+    if (sessionError) {
+      logger.error('Failed to create session', { error: sessionError })
     }
-    successUrl.searchParams.set('expires_in', tokens.expires_in.toString())
+
+    // Redirect to success page with session
+    const successUrl = new URL('/auth/success', request.url)
+    successUrl.searchParams.set('session', sessionToken)
 
     return NextResponse.redirect(successUrl)
   } catch (error) {

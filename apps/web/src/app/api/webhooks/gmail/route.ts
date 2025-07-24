@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createScopedLogger } from '@/lib/logger'
 import * as Sentry from '@sentry/nextjs'
-import { createHmac, timingSafeEqual } from 'crypto'
+import { createHmac, timingSafeEqual, randomUUID } from 'crypto'
 import { SSEMessageType } from '@/app/api/sse/email-updates/route'
 import { getPublisherClient } from '@/lib/redis-pubsub'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 import { GmailClientEnhanced } from '@finito/provider-client'
 import { google } from 'googleapis'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
+import { OAuth2Client } from 'google-auth-library'
 
 const logger = createScopedLogger('webhook.gmail')
 
@@ -37,28 +38,81 @@ interface GmailNotification {
   historyId: number
 }
 
-// Verify Pub/Sub push subscription
-function verifyPubSubSignature(request: NextRequest): boolean {
-  // In production, Google signs Pub/Sub push messages
-  // For now, we'll implement basic token verification
-  const token = request.headers.get('x-goog-pubsub-token')
-  const expectedToken = process.env.PUBSUB_VERIFICATION_TOKEN
+// OIDC JWT verification client
+const authClient = new OAuth2Client()
+
+// Verify Pub/Sub push subscription with OIDC JWT
+async function verifyPubSubSignature(request: NextRequest): Promise<boolean> {
+  // Modern approach: Verify OIDC JWT from Google Pub/Sub
+  const authHeader = request.headers.get('authorization')
   
-  if (!token || !expectedToken) {
-    logger.warn('Missing Pub/Sub verification token')
-    return false
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Fallback to legacy token verification for backward compatibility
+    // Check header first (for gcloud CLI setup)
+    let token = request.headers.get('x-goog-pubsub-token')
+    
+    // If not in header, check query parameter (for Console UI setup)
+    if (!token) {
+      const url = new URL(request.url)
+      token = url.searchParams.get('token')
+    }
+    
+    const expectedToken = process.env.PUBSUB_VERIFICATION_TOKEN
+    
+    if (!token || !expectedToken) {
+      logger.warn('Missing authentication (no JWT or verification token)')
+      return false
+    }
+    
+    // Use timing-safe comparison for legacy token
+    const tokenBuffer = Buffer.from(token)
+    const expectedBuffer = Buffer.from(expectedToken)
+    
+    if (tokenBuffer.length !== expectedBuffer.length) {
+      return false
+    }
+    
+    logger.info('Using legacy token verification')
+    return timingSafeEqual(tokenBuffer, expectedBuffer)
   }
   
-  // Use timing-safe comparison
-  const tokenBuffer = Buffer.from(token)
-  const expectedBuffer = Buffer.from(expectedToken)
+  // Extract JWT token
+  const token = authHeader.substring(7) // Remove 'Bearer ' prefix
   
-  if (tokenBuffer.length !== expectedBuffer.length) {
+  try {
+    // Verify the JWT token
+    const ticket = await authClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.PUBSUB_AUDIENCE || process.env.RAILWAY_STATIC_URL || request.url
+    })
+    
+    const payload = ticket.getPayload()
+    
+    // Verify the token is from Google Pub/Sub
+    if (payload?.email === 'system@google.com' || 
+        payload?.email_verified === true) {
+      logger.info('OIDC JWT verified successfully', {
+        issuer: payload.iss,
+        audience: payload.aud,
+        email: payload.email
+      })
+      return true
+    }
+    
+    logger.warn('JWT payload validation failed', { payload })
+    return false
+    
+  } catch (error) {
+    logger.error('JWT verification failed', { error })
     return false
   }
-  
-  return timingSafeEqual(tokenBuffer, expectedBuffer)
 }
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!
+)
 
 // Process Gmail notification
 async function processGmailNotification(notification: GmailNotification) {
@@ -70,16 +124,38 @@ async function processGmailNotification(notification: GmailNotification) {
     if (publisher.status !== 'ready') {
       await publisher.connect()
     }
-    // Look up user by email address
-    const account = await prisma.account.findFirst({
-      where: {
-        provider: 'google',
-        providerAccountId: notification.emailAddress
-      }
+    
+    // Acquire distributed lock to prevent concurrent processing for same user
+    const lockKey = `lock:gmail_sync:${notification.emailAddress}`
+    const lockValue = randomUUID() // Unique value for this lock instance
+    const lockAcquired = await publisher.set(lockKey, lockValue, {
+      NX: true, // Only set if key doesn't exist
+      EX: 300,  // Expire after 5 minutes to prevent deadlocks
     })
     
-    if (!account) {
-      logger.warn('No account found for email', { emailAddress: notification.emailAddress })
+    if (!lockAcquired) {
+      logger.warn('Sync already in progress for user, skipping notification', {
+        emailAddress: notification.emailAddress,
+        historyId: notification.historyId
+      })
+      processTimer.end({ status: 'skipped_locked' })
+      return
+    }
+    
+    try {
+    // Look up user by email address
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('provider', 'google')
+      .eq('provider_account_id', notification.emailAddress)
+      .single()
+    
+    if (accountError || !account) {
+      logger.warn('No account found for email', { 
+        emailAddress: notification.emailAddress,
+        error: accountError 
+      })
       processTimer.end({ status: 'no_account' })
       return
     }
@@ -101,11 +177,13 @@ async function processGmailNotification(notification: GmailNotification) {
     const gmailClient = new GmailClientEnhanced()
     
     // Get the last known history ID from database
-    const lastSync = await prisma.syncStatus.findUnique({
-      where: { userId: account.userId }
-    })
+    const { data: lastSync } = await supabase
+      .from('sync_status')
+      .select('*')
+      .eq('user_id', account.user_id)
+      .single()
     
-    const lastHistoryId = lastSync?.lastHistoryId
+    const lastHistoryId = lastSync?.last_history_id
     
     // Fetch history changes from Gmail
     if (lastHistoryId && parseInt(notification.historyId.toString()) > parseInt(lastHistoryId)) {
@@ -114,15 +192,37 @@ async function processGmailNotification(notification: GmailNotification) {
         newHistoryId: notification.historyId
       })
       
-      const history = await gmail.users.history.list({
-        userId: 'me',
-        startHistoryId: lastHistoryId,
-        maxResults: 500
+      // Handle pagination to ensure we get all history changes
+      let nextPageToken: string | undefined | null = undefined
+      let allHistoryItems: any[] = []
+      let isFirstPage = true
+      
+      do {
+        const history = await gmail.users.history.list({
+          userId: 'me',
+          // Only include startHistoryId on the first page request
+          startHistoryId: isFirstPage ? lastHistoryId : undefined,
+          pageToken: nextPageToken ?? undefined,
+          maxResults: 500
+        })
+        
+        isFirstPage = false
+        
+        if (history.data.history) {
+          allHistoryItems = allHistoryItems.concat(history.data.history)
+        }
+        
+        nextPageToken = history.data.nextPageToken
+      } while (nextPageToken)
+      
+      logger.info('Fetched all history changes', {
+        totalItems: allHistoryItems.length,
+        pages: Math.ceil(allHistoryItems.length / 500)
       })
       
-      if (history.data.history) {
+      if (allHistoryItems.length > 0) {
         // Process history changes
-        for (const historyItem of history.data.history) {
+        for (const historyItem of allHistoryItems) {
           // Process added messages
           if (historyItem.messagesAdded) {
             for (const added of historyItem.messagesAdded) {
@@ -130,7 +230,7 @@ async function processGmailNotification(notification: GmailNotification) {
                 const fullMessage = await gmailClient.getMessage(gmail, added.message.id)
                 
                 // Publish SSE update to Redis with error handling
-                const channel = `user:${account.userId}:updates`
+                const channel = `user:${account.user_id}:updates`
                 try {
                   await publisher.publish(channel, JSON.stringify({
                     type: SSEMessageType.NEW_EMAIL,
@@ -167,7 +267,7 @@ async function processGmailNotification(notification: GmailNotification) {
                 const message = await gmailClient.getMessage(gmail, modified.message.id)
                 
                 try {
-                  await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
+                  await publisher.publish(`user:${account.user_id}:updates`, JSON.stringify({
                     type: SSEMessageType.EMAIL_UPDATE,
                     data: message,
                     timestamp: new Date().toISOString()
@@ -175,7 +275,7 @@ async function processGmailNotification(notification: GmailNotification) {
                 } catch (publishError) {
                   logger.error(publishError instanceof Error ? publishError : new Error('Redis publish failed'), {
                     context: 'email_update_publish',
-                    channel: `user:${account.userId}:updates`,
+                    channel: `user:${account.user_id}:updates`,
                     messageId: modified.message.id
                   })
                   Sentry.captureException(publishError, {
@@ -195,7 +295,7 @@ async function processGmailNotification(notification: GmailNotification) {
             for (const deleted of historyItem.messagesDeleted) {
               if (deleted.message?.id) {
                 try {
-                  await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
+                  await publisher.publish(`user:${account.user_id}:updates`, JSON.stringify({
                     type: SSEMessageType.EMAIL_DELETE,
                     data: { id: deleted.message.id },
                     timestamp: new Date().toISOString()
@@ -203,7 +303,7 @@ async function processGmailNotification(notification: GmailNotification) {
                 } catch (publishError) {
                   logger.error(publishError instanceof Error ? publishError : new Error('Redis publish failed'), {
                     context: 'email_delete_publish',
-                    channel: `user:${account.userId}:updates`,
+                    channel: `user:${account.user_id}:updates`,
                     messageId: deleted.message.id
                   })
                   Sentry.captureException(publishError, {
@@ -222,22 +322,23 @@ async function processGmailNotification(notification: GmailNotification) {
     }
     
     // Update last history ID
-    await prisma.syncStatus.upsert({
-      where: { userId: account.userId },
-      update: {
-        lastHistoryId: notification.historyId.toString(),
-        lastSyncedAt: new Date()
-      },
-      create: {
-        userId: account.userId,
-        lastHistoryId: notification.historyId.toString(),
-        lastSyncedAt: new Date()
-      }
-    })
+    const { error: upsertError } = await supabase
+      .from('sync_status')
+      .upsert({
+        user_id: account.user_id,
+        last_history_id: notification.historyId.toString(),
+        last_synced_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      })
+    
+    if (upsertError) {
+      logger.error('Failed to update sync status', { error: upsertError })
+    }
     
     // Send sync complete notification
     try {
-      await publisher.publish(`user:${account.userId}:updates`, JSON.stringify({
+      await publisher.publish(`user:${account.user_id}:updates`, JSON.stringify({
         type: SSEMessageType.SYNC_COMPLETE,
         data: { historyId: notification.historyId },
         timestamp: new Date().toISOString()
@@ -245,7 +346,7 @@ async function processGmailNotification(notification: GmailNotification) {
     } catch (publishError) {
       logger.error(publishError instanceof Error ? publishError : new Error('Redis publish failed'), {
         context: 'sync_complete_publish',
-        channel: `user:${account.userId}:updates`
+        channel: `user:${account.user_id}:updates`
       })
       Sentry.captureException(publishError, {
         tags: { 
@@ -258,6 +359,30 @@ async function processGmailNotification(notification: GmailNotification) {
     }
     
     processTimer.end({ status: 'success' })
+    } finally {
+      // Safely release the lock only if we still own it
+      const LUA_SCRIPT = `
+        if redis.call("get", KEYS[1]) == ARGV[1] then
+          return redis.call("del", KEYS[1])
+        else
+          return 0
+        end
+      `
+      
+      try {
+        await publisher.eval(LUA_SCRIPT, {
+          keys: [lockKey],
+          arguments: [lockValue]
+        })
+      } catch (e) {
+        logger.error('Failed to release Redis lock', { 
+          error: e, 
+          lockKey,
+          emailAddress: notification.emailAddress 
+        })
+        // Continue - don't throw as this is cleanup
+      }
+    }
   } catch (error) {
     logger.error(error instanceof Error ? error : new Error('Failed to process notification'), {
       emailAddress: notification.emailAddress,
@@ -310,8 +435,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Verify the request is from Google Pub/Sub
-    if (!verifyPubSubSignature(request)) {
-      logger.warn('Invalid Pub/Sub signature', {
+    const isAuthenticated = await verifyPubSubSignature(request)
+    if (!isAuthenticated) {
+      logger.warn('Invalid Pub/Sub authentication', {
         headers: Object.fromEntries(request.headers.entries())
       })
       timer.end({ status: 'unauthorized' })
