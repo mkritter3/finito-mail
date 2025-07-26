@@ -4,19 +4,19 @@
 nixPkgs = ["nodejs-18_x", "npm-9_x"]
 
 [phases.install]
-# Clear any existing cache and do a clean install
-cmds = [
-  "rm -rf node_modules .turbo apps/web/.next",
-  "npm ci --force"
-]
+# Let's rely on `npm ci` to create a clean install. 
+# Nixpacks will handle caching node_modules correctly if we let it.
+cmds = ["npm ci"]
 
 [phases.build]
-# Build without turbo cache
-cmds = ["npx turbo build --filter=@finito/web --force --no-cache"]
+# Removed --force and --no-cache to let Turborepo and Nixpacks use their
+# default, optimized caching strategies.
+cmds = ["npx turbo build --filter=@finito/web"]
 
 [start]
 cmd = "cd apps/web && npm start"
 
 [variables]
+# We only need NODE_ENV here. Let's remove the NIXPACKS_NO_CACHE
+# to avoid the conflict.
 NODE_ENV = "production"
-NIXPACKS_NO_CACHE = "1"
