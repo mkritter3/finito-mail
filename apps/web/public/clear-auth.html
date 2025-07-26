@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Authentication</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>Clearing Authentication Data...</h1>
+    <div id="status"></div>
+    <script>
+        // Clear all authentication-related localStorage items
+        const authKeys = [
+            'finito_auth_token',
+            'gmail_access_token', 
+            'gmail_refresh_token',
+            'gmail_token_expires',
+            'user_email',
+            'user_name',
+            'user_id'
+        ];
+        
+        authKeys.forEach(key => {
+            if (localStorage.getItem(key)) {
+                localStorage.removeItem(key);
+                console.log(`Removed: ${key}`);
+            }
+        });
+        
+        // Clear any session storage as well
+        sessionStorage.clear();
+        
+        // Clear cookies
+        document.cookie.split(";").forEach(function(c) { 
+            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        });
+        
+        document.getElementById('status').innerHTML = `
+            <p style="color: green;">✓ Authentication data cleared successfully!</p>
+            <p>You can now <a href="/">return to the app</a> and sign in normally.</p>
+        `;
+        
+        // Redirect after 2 seconds
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 2000);
+    </script>
+</body>
+</html>
