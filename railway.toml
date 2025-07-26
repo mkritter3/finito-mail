@@ -2,7 +2,7 @@
 
 [build]
 builder = "nixpacks"
-buildCommand = "npm ci && npx turbo build --filter=@finito/web"
+buildCommand = "npm ci --force && npx turbo build --filter=@finito/web --force"
 
 [deploy]
 startCommand = "cd apps/web && npm start"
