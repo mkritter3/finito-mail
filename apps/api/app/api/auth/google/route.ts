@@ -1,8 +1,26 @@
+// ############################################################################
+// DEPRECATED: LEGACY AUTHENTICATION MODULE
+//
+// This module handles authentication via direct Google OAuth and is deprecated.
+// It is scheduled for removal.
+//
+// DO NOT USE FOR NEW FEATURES.
+//
+// All new authentication should be handled via Supabase OAuth in the web app.
+// See: apps/web/src/app/auth/page.tsx for the correct implementation.
+//
+// For migration details, see: /API_DEPRECATION_PLAN.md
+// Track progress: Issue #[TBD] - API App Phase-Out Epic
+//
+// Contact @tech-lead with any questions.
+// ############################################################################
+
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { randomBytes } from 'crypto';
 
 /**
+ * @deprecated Use Supabase OAuth instead
  * GET /api/auth/google - Start Google OAuth flow with CSRF protection
  */
 export async function GET(_request: NextRequest) {

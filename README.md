@@ -4,9 +4,39 @@
 
 A client-first email application that processes 99% of operations in your browser with direct provider API access, local IndexedDB storage, and production-ready server infrastructure.
 
-> **✅ PRODUCTION READY** - Infrastructure Score: 95/100  
-> **🔒 ENTERPRISE SECURITY** - Nonce-based CSP, rate limiting, input sanitization  
+> **✅ PRODUCTION READY** - Project Completion: 95% | Infrastructure Score: 95/100  
+> **🔒 ENTERPRISE SECURITY** - Nonce-based CSP, rate limiting, JWT/OIDC verification  
 > **⚡ INTELLIGENT RESILIENCE** - Circuit breakers, graceful shutdown, health monitoring  
+> **📡 REAL-TIME SYNC** - Gmail Push → Redis Pub/Sub → SSE with automatic fallback
+
+## 📊 Infrastructure Status & Migration
+
+### Current Infrastructure Migration
+We're evolving from custom implementations to battle-tested solutions for improved reliability and reduced maintenance overhead.
+
+| Component | Current State | Target State | Status |
+|-----------|--------------|--------------|--------|
+| **Authentication** | ✅ Supabase OAuth | ✅ Supabase OAuth | **Complete** |
+| **Job Processing** | ❌ Direct webhooks | 🎯 Inngest | **Planned** |
+| **Real-time Sync** | ✅ Custom SSE + Redis | ✅ Working Solution | **Complete** |
+| **Gmail API** | ⚠️ Custom retry logic | 🎯 Resilient libraries | **Planned** |
+| **Health Checks** | ✅ Custom implementation | ✅ Keep as-is | **Good** |
+
+📈 **Migration Progress**: Phase 0 of 5 complete
+
+For detailed information:
+- 🗺️ [Infrastructure Roadmap](./docs/roadmap/INFRASTRUCTURE_ROADMAP.md) - Current status and timeline
+- 🏗️ [Architecture Evolution](./docs/architecture/ARCHITECTURE_EVOLUTION.md) - Visual journey of our transformation
+- 📋 [Migration Guide](./docs/development/MIGRATION_GUIDE.md) - Developer implementation handbook
+
+## ⚠️ Deprecation Notice: Legacy API Authentication
+
+The authentication system in the API app (`apps/api`) using direct Google OAuth is **DEPRECATED** and scheduled for removal.
+
+- **All new development** MUST use the primary **Supabase OAuth** system in the web app
+- Existing features using the legacy API auth are being actively migrated
+- Please see the [API Deprecation Plan](./docs/api/API_DEPRECATION_PLAN.md) for migration details
+- Track progress in issue #[TBD] - API App Phase-Out Epic  
 
 ## 🌟 Features
 
@@ -45,7 +75,7 @@ A client-first email application that processes 99% of operations in your browse
 
 ### **Email Providers**
 - **Gmail API**: Direct access with resilient client patterns
-- **OAuth 2.0**: PKCE flow with secure token management
+- **Authentication**: Supabase Auth with Google OAuth integration
 - **Resilience**: Exponential backoff, Retry-After support, concurrency control
 
 ### **Development**
@@ -81,7 +111,8 @@ curl -H "x-health-api-key: your-key" http://localhost:3001/api/health
 
 ### **For Development**
 - Node.js 18+
-- Google Cloud Console account for OAuth setup
+- Supabase account (free tier works)
+- Google Cloud Console account for OAuth credentials
 
 ### **For Production**
 - PostgreSQL database
@@ -91,20 +122,23 @@ curl -H "x-health-api-key: your-key" http://localhost:3001/api/health
 
 ## ⚙️ Setup & Configuration
 
-### **1. Google OAuth Setup**
+### **1. Authentication Setup (Supabase + Google OAuth)**
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project or select existing
-3. Enable Gmail API:
-   - Go to "APIs & Services" > "Library"
-   - Search for "Gmail API" and click Enable
-4. Create OAuth 2.0 credentials:
-   - Go to "APIs & Services" > "Credentials"
-   - Click "Create Credentials" > "OAuth client ID"
-   - Choose "Web application"
-   - Add authorized redirect URIs:
-     - `http://localhost:3000/auth/callback` (development)
-     - `https://yourdomain.com/auth/callback` (production)
+1. **Create a Supabase Project**:
+   - Go to [Supabase](https://supabase.com) and create a new project
+   - Note your project URL and anon key
+
+2. **Configure Google OAuth in Supabase**:
+   - In Supabase Dashboard → Authentication → Providers
+   - Enable Google provider
+   - Add your Google OAuth credentials (see step 3)
+   - Copy the redirect URL provided by Supabase
+
+3. **Set up Google Cloud Console**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com)
+   - Enable Gmail API for your project
+   - Create OAuth 2.0 credentials (if you haven't already)
+   - Add Supabase's redirect URL to authorized redirect URIs
 
 ### **2. Environment Configuration**
 
@@ -115,10 +149,9 @@ cp .env.example .env.local
 
 **Required for Development:**
 ```env
-# Google OAuth
-NEXT_PUBLIC_GOOGLE_CLIENT_ID="your-client-id"
-GOOGLE_CLIENT_ID="your-client-id"
-GOOGLE_CLIENT_SECRET="your-client-secret"
+# Supabase Authentication
+NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
 
 # Application
 NEXTAUTH_SECRET="your-secure-secret"
@@ -332,13 +365,17 @@ curl -H "x-health-api-key: your-key" https://api.yourdomain.com/api/health
 
 ## 📚 Documentation
 
-### **Production Guides**
-- 📖 [**Production Infrastructure**](./PRODUCTION_INFRASTRUCTURE.md) - Complete technical specification
-- 🚀 [**Deployment Guide**](./live_docs/PRODUCTION_DEPLOYMENT.md) - Step-by-step deployment
-- 📡 [**API Reference**](./live_docs/API_REFERENCE.md) - Complete API documentation
-- 🧠 [**Implementation Learnings**](./CLAUDE_KNOWLEDGE.md) - Architecture discoveries
+Our documentation is organized into clear categories for easy navigation. Visit the [**Documentation Hub**](./docs/README.md) for the complete index.
 
-### **Development Docs**
+### **Quick Links**
+- 🚀 [**Getting Started**](./docs/getting-started/environment-setup.md) - Set up your development environment
+- 🏗️ [**Architecture Overview**](./docs/architecture/ARCHITECTURE.md) - System design and components
+- 📡 [**API Reference**](./docs/api/API_REFERENCE.md) - Complete API documentation
+- 🚢 [**Deployment Guide**](./docs/deployment/PRODUCTION_DEPLOYMENT.md) - Production deployment
+
+### **Key Resources**
+- 📖 [**Complete Documentation**](./docs/README.md) - Full documentation index
+- 🧠 [**Implementation Learnings**](./CLAUDE_KNOWLEDGE.md) - Architecture discoveries
 - 🛠️ [**MCP Tools**](./live_docs/TOOLS_MCP.md) - Development workflow tools
 - 🧭 [**Claude Guide**](./live_docs/CLAUDE.md) - AI-assisted development
 
@@ -372,20 +409,20 @@ curl -H "x-health-api-key: your-key" https://api.yourdomain.com/api/health
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](./CONTRIBUTING.md) for details.
+We welcome contributions! Please see our [**Contributing Guide**](./CONTRIBUTING.md) for detailed information on:
 
-### **Development Setup**
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes with tests
-4. Ensure all checks pass: `npm run lint && npm run type-check`
-5. Submit a pull request
+- Development setup and workflow
+- Code standards and testing requirements
+- Pull request process
+- Architecture guidelines
 
-### **Code Standards**
-- TypeScript for type safety
-- ESLint + Prettier for code formatting
-- Comprehensive testing (unit + E2E)
-- Security-first development practices
+### 🔐 Important: Authentication Guidelines
+
+When adding or modifying features that require user authentication:
+
+- ✅ **USE**: Supabase OAuth for all authentication (see `apps/web/src/lib/supabase.ts`)
+- ❌ **DO NOT USE**: The legacy API auth system in `apps/api/lib/auth.ts` (deprecated)
+- 📋 **Questions?**: Check the [API Deprecation Plan](./docs/api/API_DEPRECATION_PLAN.md)
 
 ## 📊 Project Status
 
