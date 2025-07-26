@@ -459,6 +459,24 @@ export async function POST(request: NextRequest) {
       )
     }
     
+    // Handle idempotency - Google Pub/Sub may send duplicates
+    const messageId = body.message.messageId
+    const publisher = getPublisherClient()
+    
+    if (publisher.status === 'ready') {
+      const dedupeKey = `webhook-processed:${messageId}`
+      const alreadyProcessed = await publisher.get(dedupeKey)
+      
+      if (alreadyProcessed) {
+        logger.info('Duplicate message, already processed', { messageId })
+        timer.end({ status: 'duplicate' })
+        return NextResponse.json({ success: true })
+      }
+      
+      // Mark as processed with 5-minute TTL
+      await publisher.set(dedupeKey, '1', { EX: 300 })
+    }
+    
     // Decode the notification data
     const decodedData = Buffer.from(body.message.data, 'base64').toString('utf-8')
     const notification: GmailNotification = JSON.parse(decodedData)

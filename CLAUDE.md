@@ -16,6 +16,11 @@
 ### 🧠 Persistent Learning
 - **[CLAUDE_KNOWLEDGE.md](./CLAUDE_KNOWLEDGE.md)** - Your accumulated knowledge and experience
 
+### 📚 Project Documentation Structure
+- **[docs/README.md](./docs/README.md)** - Main documentation hub
+- **[docs/troubleshooting/](./docs/troubleshooting/)** - Common issues and FAQ
+- **[docs/architecture/decisions/](./docs/architecture/decisions/)** - Architecture Decision Records
+
 ## 🔄 Self-Learning Process
 
 ### 1. Documentation Sources (Priority Order)
@@ -98,9 +103,57 @@ This documentation system:
 4. **Update Memory** → Add findings to `CLAUDE_KNOWLEDGE.md`
 5. **Stay Current** → System auto-updates documentation based on verification
 
+## 📝 Documentation Maintenance
+
+### Checking Documentation Integrity
+```bash
+# Run the documentation integrity checker
+node scripts/check-docs-integrity.js
+
+# This will:
+# - Find all markdown files in /docs
+# - Check for orphaned files (not linked in any README)
+# - Check for broken links
+# - Exit with error if issues found
+```
+
+### Adding New Documentation
+1. **Choose the right location** based on content type:
+   - `/docs/getting-started/` - Setup and quickstart guides
+   - `/docs/architecture/` - System design and technical details
+   - `/docs/features/` - Feature-specific documentation
+   - `/docs/troubleshooting/` - Common issues and solutions
+   - `/docs/architecture/decisions/` - ADRs for major decisions
+
+2. **Update the section's README.md** to include your new file
+3. **Run integrity check** to ensure no orphaned files
+4. **Follow the format** of existing documentation
+
+### Creating Architecture Decision Records (ADRs)
+```bash
+# 1. Copy the template
+cp docs/architecture/decisions/adr-template.md docs/architecture/decisions/XXXX-your-decision.md
+
+# 2. Fill in all sections:
+# - Context (the problem)
+# - Decision (what we're doing)  
+# - Consequences (trade-offs)
+# - Alternatives (what else we considered)
+
+# 3. Update the ADR index
+# Edit docs/architecture/decisions/README.md to add your ADR
+```
+
+### Documentation Best Practices
+- **Keep it current** - Update docs when code changes
+- **Be specific** - Include code examples and commands
+- **Think of the reader** - What would a new developer need to know?
+- **Use visuals** - Diagrams help explain complex concepts
+- **Test your docs** - Follow your own instructions
+
 ---
 
-**Claude: This system ensures you always have accurate, working information and never get confused by outdated commands. Always read from `live_docs/` and update your knowledge after completing tasks.**
+**Claude: This system ensures you always have accurate, working information and never get confused by outdated commands. Always read from `live_docs/` and update your knowledge after completing tasks. When adding new documentation, always run the integrity checker and update relevant index files.**
 
 ---
 

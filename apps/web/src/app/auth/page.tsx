@@ -1,87 +1,59 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@finito/ui'
+import { supabase } from '@/lib/supabase'
 
-function AuthPageContent() {
+export default function AuthPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
   useEffect(() => {
-    // Check if there's an error from OAuth callback
-    const errorParam = searchParams.get('error')
-    if (errorParam) {
-      setError(`Authentication failed: ${errorParam}`)
-    }
-
-    // Check if already authenticated
-    const checkAuth = async () => {
-      try {
-        const token = localStorage.getItem('finito_auth_token')
-        if (token) {
-          // Verify token with API
-          const response = await fetch('/api/auth/me', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          })
-          
-          if (response.ok) {
-            router.push('/mail')
-            return
-          } else {
-            // Token is invalid, remove it
-            localStorage.removeItem('finito_auth_token')
-            localStorage.removeItem('gmail_access_token')
-            localStorage.removeItem('gmail_refresh_token')
-            localStorage.removeItem('gmail_token_expires')
-          }
-        }
-      } catch (error) {
-        console.error('Error checking auth:', error)
-        localStorage.removeItem('finito_auth_token')
-      } finally {
-        setIsCheckingAuth(false)
+    // Check if user is already authenticated
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.push('/mail')
       }
-    }
-    checkAuth()
-  }, [router, searchParams])
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        router.push('/mail')
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [router])
 
   const handleGoogleAuth = async () => {
     try {
       setIsLoading(true)
       setError(null)
 
-      // Get authorization URL from API
-      const response = await fetch('/api/auth/google')
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to initialize authentication')
-      }
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          scopes: 'email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
+        }
+      })
 
-      // Redirect to Google auth
-      window.location.href = data.authUrl
+      if (error) {
+        throw error
+      }
     } catch (error) {
       console.error('Auth error:', error)
       setError(error instanceof Error ? error.message : 'Failed to initialize authentication')
       setIsLoading(false)
     }
   }
-
-  if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
-
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -104,18 +76,12 @@ function AuthPageContent() {
           <div className="space-y-4">
             <Button
               onClick={handleGoogleAuth}
-              disabled={isLoading || !clientId}
+              disabled={isLoading}
               className="w-full"
               size="lg"
             >
               {isLoading ? 'Connecting...' : 'Continue with Google'}
             </Button>
-
-            {!clientId && (
-              <p className="text-sm text-center text-red-600">
-                Google Client ID not configured. Please set NEXT_PUBLIC_GOOGLE_CLIENT_ID environment variable.
-              </p>
-            )}
           </div>
 
           <div className="text-center">
@@ -126,17 +92,5 @@ function AuthPageContent() {
         </div>
       </div>
     </div>
-  )
-}
-
-export default function AuthPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    }>
-      <AuthPageContent />
-    </Suspense>
   )
 }

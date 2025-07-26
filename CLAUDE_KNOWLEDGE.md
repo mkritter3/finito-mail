@@ -669,3 +669,183 @@ Gmail → Pub/Sub → Webhook → Process History → SSE → Client
 4. **End-to-End Testing** - Verify complete flow from Gmail to client
 
 **Last Knowledge Update**: 2025-01-23 - Completed real-time sync implementation with SSE and webhook infrastructure.
+
+## 📚 Documentation Reorganization (LEARNED 2025-01-25)
+
+### Unified Documentation Structure Implemented
+Successfully reorganized ~58 documentation files into clean hierarchy:
+
+**✅ FINAL STRUCTURE:**
+```
+docs/
+├── README.md                    # Main documentation hub
+├── getting-started/            # Quick start guides  
+├── architecture/              # System design
+├── features/                 # Feature documentation
+├── deployment/              # Deployment guides
+├── development/            # Developer guides
+├── api/                   # API documentation
+├── roadmap/              # Future plans
+└── archive/             # Historical docs
+```
+
+**Key Implementation Details:**
+- Moved ~40 files from scattered locations (root, docs) into organized categories
+- Created comprehensive index files for each section with navigation
+- Updated all cross-references in root README.md
+- Consolidated duplicate deployment documentation
+- Kept only essential files in root: README, CONTRIBUTING, LICENSE, CLAUDE files
+
+### Gemini's Validation & Recommendations
+1. **Structure validated as optimal** - Audience-centric, scalable, and clear
+2. **Follows battle-tested patterns** - Ready for tools like Docusaurus/VitePress
+3. **Suggested enhancements:**
+   - Add CI script to check for orphaned files
+   - Create troubleshooting/FAQ section
+   - Implement Architecture Decision Records (ADRs)
+   - Plan for automated API doc generation
+
+### Key Learnings
+1. **Documentation is code** - Should be versioned, tested, and automated
+2. **Structure enables tools** - Conventional structure makes tool adoption trivial
+3. **Automation prevents decay** - CI checks maintain documentation integrity
+4. **ADRs capture "why"** - Critical for understanding past decisions
+
+**Last Knowledge Update**: 2025-01-25 - Documentation reorganization completed and validated.
+
+## 🚀 Gmail Webhook Testing with ngrok (LEARNED 2025-01-25)
+
+### Production Readiness Roadmap from Gemini
+Based on comprehensive analysis, here's the prioritized roadmap to production:
+
+**Priority Sequence**: Feature Completeness → Feature Reliability → Architectural Soundness → Scalability
+
+**Priority #1: Gmail Webhook Testing (Current)**
+- Set up ngrok for local webhook testing
+- Test scenarios A1-A4 (happy path) and B1-B5 (edge cases)
+- Measure E2E latency (<5s threshold)
+- Document findings and fix issues
+
+**Priority #2: E2E Test Implementation**
+- Two-tiered testing strategy: integration tests for backend, E2E for full system
+- Focus on critical user journeys
+- Validate real-time sync behavior
+
+**Priority #3: Inngest Migration**
+- Use Strangler Fig Pattern for zero-downtime migration
+- Implement dry-run shadowing for validation
+- Proxy pattern using Next.js API routes (not separate service)
+
+**Timeline**: 6-8 weeks to production readiness
+
+### Webhook Testing Infrastructure Created
+
+**✅ COMPLETED SETUP:**
+
+1. **Testing Guide** (`/docs/deployment/WEBHOOK_TESTING_GUIDE.md`)
+   - Comprehensive test scenarios (A1-A4, B1-B5)
+   - Performance metrics and monitoring
+   - Troubleshooting guide
+   - Results documentation template
+
+2. **Test Script** (`/scripts/test-webhook.js`)
+   - Automated webhook testing for all scenarios
+   - Support for idempotency, rapid-fire, auth failure tests
+   - Built-in health checks
+   - Environment variable configuration
+
+3. **Setup Script** (`/scripts/setup-ngrok.sh`)
+   - Checks ngrok installation and authentication
+   - Provides step-by-step setup instructions
+   - Includes Google Cloud Pub/Sub configuration commands
+
+4. **Webhook Implementation Reviewed**
+   - Robust authentication (OIDC JWT + legacy token fallback)
+   - Rate limiting with bypass for testing
+   - Idempotency handling with Redis deduplication
+   - Comprehensive error handling and Sentry integration
+   - Redis Pub/Sub for real-time event distribution
+
+### Key Implementation Details
+
+**Webhook Flow:**
+```
+Gmail → Pub/Sub → Webhook → Redis Pub/Sub → SSE → Client
+         ↓                      ↓
+    Authentication         Idempotency Check
+```
+
+**Security Features:**
+- OIDC JWT verification for production
+- Legacy token verification for backward compatibility
+- Timing-safe comparison for tokens
+- Rate limiting with configurable bypass
+
+**Testing Requirements:**
+1. ngrok account and authtoken
+2. Google Cloud project with Pub/Sub enabled
+3. Redis running locally
+4. Sentry configured for error tracking
+
+### Next Steps
+1. Configure ngrok authentication: `ngrok config add-authtoken YOUR_TOKEN`
+2. Start ngrok: `./scripts/setup-ngrok.sh`
+3. Update environment variables with ngrok URL
+4. Run comprehensive tests: `node scripts/test-webhook.js all`
+5. Document results using provided template
+
+**Last Knowledge Update**: 2025-01-25 - Gmail webhook testing infrastructure implemented and ready for execution.
+
+## 🔄 Real-Time Sync Implementation Discovery (CRITICAL UPDATE 2025-01-25)
+
+### Major Documentation Discrepancy Found
+After comprehensive codebase review with Gemini, discovered that **real-time sync is FULLY IMPLEMENTED** despite documentation claiming it's NOT:
+
+**✅ ACTUAL IMPLEMENTATION STATUS:**
+1. **Complete Webhook System** (`/api/webhooks/gmail/route.ts`)
+   - JWT/OIDC dual authentication
+   - Distributed locking for concurrent processing
+   - Rate limiting with SHA256 user identification
+   - Idempotency handling for duplicate messages
+
+2. **Redis Pub/Sub Architecture** (`/lib/redis-pubsub.ts`)
+   - Publisher/subscriber pattern for distributed systems
+   - Connection pooling with 50 SSE limit per instance
+   - Requires standard Redis (not Upstash)
+
+3. **Server-Sent Events (SSE)** (`/api/sse/email-updates/route.ts`)
+   - Real-time streaming to clients
+   - Heartbeat mechanism every 30 seconds
+   - Automatic cleanup on disconnect
+   - Per-user channel subscriptions
+
+4. **Client-Side Integration** (`/hooks/use-real-time-sync.ts`)
+   - SSE with automatic fallback to polling
+   - 10-second delay before fallback activation
+   - Health monitoring and reconnection logic
+
+5. **Database Support** (`/migrations/010_gmail_sync_tables.sql`)
+   - gmail_watch table for subscription tracking
+   - sync_status table for history ID tracking
+   - Proper indexes and triggers
+
+### Production Readiness Update
+- **Documentation claimed**: 85% complete, real-time sync NOT implemented
+- **Actual status**: ~95% complete with sophisticated real-time sync
+- **User was correct**: "we implemented real time sync yesterday" was accurate
+
+### Key Requirements
+- **Redis**: Must use standard Redis instance with Pub/Sub support
+- **Environment variables**: REDIS_URL, GMAIL_PUBSUB_TOPIC, PUBSUB_VERIFICATION_TOKEN
+- **Connection limits**: 50 SSE connections per Vercel instance (may need scaling strategy)
+
+### Architecture Flow
+```
+Gmail → Google Cloud Pub/Sub → Webhook (JWT verification)
+  ↓
+Redis Pub/Sub (distributes to all instances)
+  ↓
+SSE endpoints → Client browsers (with fallback to polling)
+```
+
+**CRITICAL**: Documentation needs major updates to reflect this implementation!

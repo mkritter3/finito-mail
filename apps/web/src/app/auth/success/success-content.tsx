@@ -12,11 +12,12 @@ export default function SuccessContent() {
   useEffect(() => {
     const processTokens = async () => {
       try {
+        const token = searchParams.get('token') // JWT session token
         const accessToken = searchParams.get('access_token')
         const refreshToken = searchParams.get('refresh_token')
         const expiresIn = searchParams.get('expires_in')
 
-        if (!accessToken || !expiresIn) {
+        if (!token || !accessToken || !expiresIn) {
           setError('Missing authentication tokens')
           return
         }
@@ -32,8 +33,8 @@ export default function SuccessContent() {
           localStorage.setItem('gmail_refresh_token', refreshToken)
         }
 
-        // Store a general auth token for the app
-        localStorage.setItem('finito_auth_token', accessToken)
+        // Store the JWT session token
+        localStorage.setItem('finito_auth_token', token)
 
         // Redirect to mail app
         router.push('/mail')

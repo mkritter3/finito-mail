@@ -1,0 +1,36 @@
+name: Documentation Integrity Check
+
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - 'scripts/check-docs-integrity.js'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'scripts/check-docs-integrity.js'
+
+jobs:
+  check-docs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Check documentation integrity
+      run: |
+        echo "🔍 Checking documentation integrity..."
+        node scripts/check-docs-integrity.js
+        
+    - name: Report results
+      if: failure()
+      run: |
+        echo "❌ Documentation integrity check failed!"
+        echo "Please fix orphaned files or broken links before merging."
+        echo "Run 'node scripts/check-docs-integrity.js' locally to see details."

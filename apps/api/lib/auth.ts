@@ -1,3 +1,20 @@
+// ############################################################################
+// DEPRECATED: LEGACY AUTHENTICATION UTILITIES
+//
+// This module contains authentication utilities for the deprecated direct
+// Google OAuth system. It is scheduled for removal.
+//
+// DO NOT USE FOR NEW FEATURES.
+//
+// All new authentication should use Supabase Auth from the web app.
+// See: apps/web/src/lib/supabase.ts for the correct implementation.
+//
+// For migration details, see: /API_DEPRECATION_PLAN.md
+// Track progress: Issue #[TBD] - API App Phase-Out Epic
+//
+// Contact @tech-lead with any questions.
+// ############################################################################
+
 import { NextRequest } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { Client } from 'pg';
