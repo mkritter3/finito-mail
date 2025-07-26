@@ -4,13 +4,19 @@
 nixPkgs = ["nodejs-18_x", "npm-9_x"]
 
 [phases.install]
-cmds = ["npm ci --force"]
+# Clear any existing cache and do a clean install
+cmds = [
+  "rm -rf node_modules .turbo apps/web/.next",
+  "npm ci --force"
+]
 
 [phases.build]
-cmds = ["npx turbo build --filter=@finito/web --force"]
+# Build without turbo cache
+cmds = ["npx turbo build --filter=@finito/web --force --no-cache"]
 
 [start]
 cmd = "cd apps/web && npm start"
 
 [variables]
 NODE_ENV = "production"
+NIXPACKS_NO_CACHE = "1"
