@@ -39,12 +39,13 @@ export async function GET(request: NextRequest) {
   let heartbeatInterval: NodeJS.Timeout | null = null
   
   try {
-    // Get session from cookies (Next.js auth uses cookies, not Authorization header)
-    const { getServerSession } = await import('next-auth')
-    const { authOptions } = await import('@/lib/auth')
-    const session = await getServerSession(authOptions)
+    // Get session from Supabase
+    const { createRouteHandlerClient } = await import('@supabase/auth-helpers-nextjs')
+    const { cookies } = await import('next/headers')
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     
-    if (!session?.user?.id) {
+    if (sessionError || !session?.user?.id) {
       logger.warn('Unauthorized SSE connection attempt')
       timer.end({ status: 'unauthorized' })
       return new Response('Unauthorized', { status: 401 })

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useSession } from 'next-auth/react'
 import { createScopedLogger } from '@/lib/logger'
 import { SSEMessageType } from '@/app/api/sse/email-updates/route'
 import { useEmailStore } from '@/stores/email-store'
@@ -24,7 +23,6 @@ interface UseEmailUpdatesOptions {
 }
 
 export function useEmailUpdates(options: UseEmailUpdatesOptions = {}) {
-  const { data: session } = useSession()
   const [isConnected, setIsConnected] = useState(false)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
   const eventSourceRef = useRef<EventSource | null>(null)
@@ -80,11 +78,6 @@ export function useEmailUpdates(options: UseEmailUpdatesOptions = {}) {
   
   // Connect to SSE endpoint
   const connect = useCallback(() => {
-    if (!session?.accessToken) {
-      logger.debug('No session token, skipping SSE connection')
-      return
-    }
-    
     if (eventSourceRef.current) {
       logger.debug('SSE already connected')
       return
@@ -93,6 +86,7 @@ export function useEmailUpdates(options: UseEmailUpdatesOptions = {}) {
     logger.info('Connecting to SSE endpoint...')
     
     try {
+      // The endpoint is protected by Supabase auth via cookies
       const eventSource = new EventSource('/api/sse/email-updates', {
         withCredentials: true
       })
@@ -232,7 +226,6 @@ export function useEmailUpdates(options: UseEmailUpdatesOptions = {}) {
       }
     }
   }, [
-    session?.accessToken,
     onNewEmail,
     onEmailUpdate,
     onEmailDelete,
@@ -249,14 +242,11 @@ export function useEmailUpdates(options: UseEmailUpdatesOptions = {}) {
     resetHeartbeat
   ])
   
-  // Auto-connect when session is available
+  // Auto-connect on mount
   useEffect(() => {
-    if (session?.accessToken) {
-      connect()
-    }
-    
+    connect()
     return cleanup
-  }, [session?.accessToken, connect, cleanup])
+  }, [connect, cleanup])
   
   // Handle page visibility changes
   useEffect(() => {
