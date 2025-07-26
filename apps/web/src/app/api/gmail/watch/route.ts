@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { google } from 'googleapis'
 import { createScopedLogger } from '@/lib/logger'
-import { prisma } from '@/lib/prisma'
 import * as Sentry from '@sentry/nextjs'
 
 const logger = createScopedLogger('gmail.watch')
@@ -15,10 +14,11 @@ export async function POST(request: NextRequest) {
   const timer = logger.time('setup-gmail-watch')
   
   try {
-    // Get session
-    const session = await getServerSession(authOptions)
+    // Get session from Supabase
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     
-    if (!session?.user?.email) {
+    if (sessionError || !session?.user) {
       timer.end({ status: 'unauthorized' })
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -26,18 +26,14 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Get account with Gmail credentials
-    const account = await prisma.account.findFirst({
-      where: {
-        userId: session.user.id,
-        provider: 'google'
-      }
-    })
+    // Get provider token from session
+    const providerToken = session.provider_token
+    const providerRefreshToken = session.provider_refresh_token
     
-    if (!account) {
-      timer.end({ status: 'no_account' })
+    if (!providerToken) {
+      timer.end({ status: 'no_provider_token' })
       return NextResponse.json(
-        { error: 'Google account not linked' },
+        { error: 'Google provider token not found' },
         { status: 400 }
       )
     }
@@ -50,9 +46,8 @@ export async function POST(request: NextRequest) {
     )
     
     oauth2Client.setCredentials({
-      access_token: account.access_token,
-      refresh_token: account.refresh_token,
-      expiry_date: account.expires_at ? account.expires_at * 1000 : undefined
+      access_token: providerToken,
+      refresh_token: providerRefreshToken
     })
     
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
@@ -96,34 +91,37 @@ export async function POST(request: NextRequest) {
       expiration: watchResponse.data.expiration
     })
     
-    // Store watch details
-    await prisma.gmailWatch.upsert({
-      where: { userId: session.user.id },
-      update: {
-        historyId: watchResponse.data.historyId,
-        expiration: new Date(parseInt(watchResponse.data.expiration)),
-        updatedAt: new Date()
-      },
-      create: {
-        userId: session.user.id,
-        historyId: watchResponse.data.historyId,
-        expiration: new Date(parseInt(watchResponse.data.expiration))
-      }
-    })
+    // Store watch details in Supabase
+    const { error: watchError } = await supabase
+      .from('gmail_watch')
+      .upsert({
+        user_id: session.user.id,
+        email_address: session.user.email,
+        history_id: watchResponse.data.historyId,
+        expiration: new Date(parseInt(watchResponse.data.expiration)).toISOString(),
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      })
+    
+    if (watchError) {
+      throw new Error(`Failed to store watch details: ${watchError.message}`)
+    }
     
     // Update sync status with history ID
-    await prisma.syncStatus.upsert({
-      where: { userId: session.user.id },
-      update: {
-        lastHistoryId: watchResponse.data.historyId,
-        lastSyncedAt: new Date()
-      },
-      create: {
-        userId: session.user.id,
-        lastHistoryId: watchResponse.data.historyId,
-        lastSyncedAt: new Date()
-      }
-    })
+    const { error: syncError } = await supabase
+      .from('sync_status')
+      .upsert({
+        user_id: session.user.id,
+        last_history_id: watchResponse.data.historyId,
+        last_synced_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      })
+    
+    if (syncError) {
+      throw new Error(`Failed to update sync status: ${syncError.message}`)
+    }
     
     // Track metric
     Sentry.setMeasurement('gmail.watch.setup', 1, 'none')
@@ -151,20 +149,23 @@ export async function POST(request: NextRequest) {
 // Check watch status
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     
-    if (!session?.user?.id) {
+    if (sessionError || !session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
     
-    const watch = await prisma.gmailWatch.findUnique({
-      where: { userId: session.user.id }
-    })
+    const { data: watch, error: watchError } = await supabase
+      .from('gmail_watch')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .single()
     
-    if (!watch) {
+    if (watchError || !watch) {
       return NextResponse.json({
         active: false,
         message: 'No active watch'
@@ -172,13 +173,14 @@ export async function GET(request: NextRequest) {
     }
     
     const now = new Date()
-    const isExpired = watch.expiration < now
-    const needsRenewal = watch.expiration.getTime() - now.getTime() < WATCH_EXPIRATION_MS
+    const expiration = new Date(watch.expiration)
+    const isExpired = expiration < now
+    const needsRenewal = expiration.getTime() - now.getTime() < WATCH_EXPIRATION_MS
     
     return NextResponse.json({
       active: !isExpired,
-      historyId: watch.historyId,
-      expiration: watch.expiration.toISOString(),
+      historyId: watch.history_id,
+      expiration: watch.expiration,
       isExpired,
       needsRenewal
     })
