@@ -58,6 +58,26 @@ export async function login(
       localStorage.setItem('gmail_access_token', tokens.gmail_access_token)
       localStorage.setItem('gmail_refresh_token', tokens.gmail_refresh_token)
       localStorage.setItem('gmail_token_expires', String(tokens.gmail_token_expires))
+      
+      // For Supabase auth, we need to set the session in localStorage
+      // Supabase stores the session under a specific key pattern
+      const supabaseKey = `sb-${window.location.hostname}-auth-token`
+      const mockSession = {
+        access_token: tokens.finito_auth_token,
+        token_type: 'bearer',
+        expires_in: 3600,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        refresh_token: tokens.gmail_refresh_token,
+        user: tokens.user,
+        provider_token: tokens.gmail_access_token,
+        provider_refresh_token: tokens.gmail_refresh_token
+      }
+      
+      // Store the session in the format Supabase expects
+      localStorage.setItem(supabaseKey, JSON.stringify({
+        currentSession: mockSession,
+        expiresAt: Math.floor(Date.now() / 1000) + 3600
+      }))
     }, tokens)
 
     return tokens.user

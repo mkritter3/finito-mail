@@ -1,42 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-
 export default function AuthCallbackPage() {
-  const router = useRouter()
-
-  useEffect(() => {
-    // Supabase handles the callback automatically
-    // We just need to wait for the session to be established
-    const handleCallback = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession()
-      
-      if (error) {
-        console.error('Session error:', error)
-        router.push('/auth?error=callback_failed')
-        return
-      }
-
-      if (session) {
-        // Log the available tokens
-        console.log('Auth successful:', {
-          user: session.user.email,
-          hasProviderToken: !!session.provider_token,
-          hasProviderRefreshToken: !!session.provider_refresh_token
-        })
-        
-        // Session established, redirect to mail
-        router.push('/mail')
-      } else {
-        // No session, something went wrong
-        router.push('/auth?error=no_session')
-      }
-    }
-    
-    handleCallback()
-  }, [router])
+  // The server-side route handler (route.ts) processes the OAuth callback
+  // This page just shows a loading state while the redirect happens
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">

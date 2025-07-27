@@ -1,130 +1,31 @@
-'use client'
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { MailShell } from './mail-shell'
 
-import { useState, useEffect } from 'react'
-import { useHotkeys } from 'react-hotkeys-hook'
-import { Sidebar } from '@/components/sidebar'
-import { Header } from '@/components/header'
-import { TodoPanel } from '@/components/todo-panel'
-import { SearchPanel } from '@/components/search-panel'
-import { CommandPalette } from '@/components/command-palette'
-import { KeyboardShortcutsDialog } from '@/components/keyboard-shortcuts-dialog'
-import { ComposeDialog } from '@/components/compose-dialog'
-import { initializeDatabase } from '@finito/storage'
-
-export default function MailLayout({
+export default async function MailLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [todoPanelOpen, setTodoPanelOpen] = useState(false)
-  const [searchPanelOpen, setSearchPanelOpen] = useState(false)
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
-  const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState(false)
-  const [composeOpen, setComposeOpen] = useState(false)
-  const [composeMode, setComposeMode] = useState<'compose' | 'reply' | 'replyAll' | 'forward'>('compose')
-  const [replyToEmail, setReplyToEmail] = useState<any>(null)
+  // Create server-side Supabase client
+  const supabase = await createClient()
 
-  // Initialize database synchronously to avoid hook timing issues
-  const [dbInitialized, setDbInitialized] = useState(false)
-  
-  useEffect(() => {
-    // Check authentication
-    const token = localStorage.getItem('finito_auth_token')
-    if (!token) {
-      window.location.href = '/auth'
-      return
-    }
-    
-    if (!dbInitialized) {
-      initializeDatabase()
-      setDbInitialized(true)
-    }
-  }, [dbInitialized])
+  // Check if user is authenticated
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  // Listen for compose event from sidebar
-  useEffect(() => {
-    const handleComposeEvent = (event: any) => {
-      const detail = event.detail || {}
-      setComposeMode(detail.mode || 'compose')
-      setReplyToEmail(detail.replyTo || null)
-      setComposeOpen(true)
-    }
-    window.addEventListener('compose-email', handleComposeEvent)
-    return () => window.removeEventListener('compose-email', handleComposeEvent)
-  }, [])
+  // Defense in depth: redirect if no user
+  // (middleware should have already caught this)
+  if (!user) {
+    redirect('/auth')
+  }
 
-  // Global keyboard shortcuts
-  useHotkeys('cmd+k, ctrl+k', () => setCommandPaletteOpen(true))
-  useHotkeys('cmd+/, ctrl+/', () => setShortcutsDialogOpen(true))
-  useHotkeys('cmd+\\, ctrl+\\', () => setSidebarOpen(!sidebarOpen))
-  useHotkeys('t', () => setTodoPanelOpen(!todoPanelOpen))
-  useHotkeys('\\', () => setSearchPanelOpen(true))
-  useHotkeys('c', () => {
-    setComposeMode('compose')
-    setReplyToEmail(null)
-    setComposeOpen(true)
-  })
-  useHotkeys('r', () => {
-    // Reply shortcut will be handled by email view
-    window.dispatchEvent(new CustomEvent('keyboard-reply'))
-  })
-  useHotkeys('a', () => {
-    // Reply all shortcut will be handled by email view
-    window.dispatchEvent(new CustomEvent('keyboard-reply-all'))
-  })
-  useHotkeys('f', () => {
-    // Forward shortcut will be handled by email view
-    window.dispatchEvent(new CustomEvent('keyboard-forward'))
-  })
-  useHotkeys('escape', () => {
-    setSearchPanelOpen(false)
-    setCommandPaletteOpen(false)
-    setComposeOpen(false)
-  })
-
+  // At this point, we have a valid user
+  // Pass user data to the client shell if needed
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-
-      {/* Main content */}
-      <div className="flex flex-1 flex-col">
-        {/* Header */}
-        <Header />
-
-        {/* Email content */}
-        <main className="flex-1 overflow-hidden">
-          {children}
-        </main>
-      </div>
-
-      {/* Todo Panel */}
-      <TodoPanel isOpen={todoPanelOpen} onClose={() => setTodoPanelOpen(false)} />
-
-      {/* Search Panel */}
-      <SearchPanel isOpen={searchPanelOpen} onClose={() => setSearchPanelOpen(false)} />
-
-      {/* Command Palette */}
-      <CommandPalette isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
-
-      {/* Keyboard Shortcuts Dialog */}
-      <KeyboardShortcutsDialog 
-        isOpen={shortcutsDialogOpen} 
-        onClose={() => setShortcutsDialogOpen(false)} 
-      />
-
-      {/* Compose Dialog */}
-      <ComposeDialog
-        isOpen={composeOpen}
-        onClose={() => {
-          setComposeOpen(false)
-          setComposeMode('compose')
-          setReplyToEmail(null)
-        }}
-        mode={composeMode}
-        replyTo={replyToEmail}
-      />
-    </div>
+    <MailShell userEmail={user.email}>
+      {children}
+    </MailShell>
   )
 }

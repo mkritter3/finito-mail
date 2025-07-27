@@ -1,29 +1,27 @@
-'use client'
-
-import { useParams } from 'next/navigation'
-import { EmailList } from '@/components/email-list'
-import { EmailView } from '@/components/email-view'
-import { useEmailStore } from '@/stores/email-store'
+import { createClient } from '@/lib/supabase/server'
+import { MailView } from './mail-view'
 import type { EmailFolder } from '@finito/types'
 
-export default function MailPage() {
-  const params = useParams()
+interface PageProps {
+  params: {
+    folder: string
+  }
+}
+
+async function fetchEmails(folder: string) {
+  const supabase = await createClient()
+  
+  // For now, return empty array - actual implementation would fetch from database
+  // This will be implemented when we have the email syncing logic
+  return []
+}
+
+export default async function MailPage({ params }: PageProps) {
   const folder = (params.folder as EmailFolder) || 'inbox'
-  const selectedEmailId = useEmailStore((state) => state.selectedEmailId)
+  
+  // Fetch emails server-side
+  const emails = await fetchEmails(folder)
 
-  return (
-    <div className="flex h-full">
-      {/* Email list */}
-      <div className={`${selectedEmailId ? 'w-2/5' : 'w-full'} border-r border-border`}>
-        <EmailList folder={folder} />
-      </div>
-
-      {/* Email detail */}
-      {selectedEmailId && (
-        <div className="flex-1">
-          <EmailView emailId={selectedEmailId} />
-        </div>
-      )}
-    </div>
-  )
+  // Pass data to client component for interaction
+  return <MailView initialEmails={emails} folder={folder} />
 }

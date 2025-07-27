@@ -1,25 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { syncRecentEmails } from '@/app/actions/email-sync'
+import { logout } from '@/app/auth/actions'
 import { RefreshCw } from 'lucide-react'
 
 export function Header() {
-  const { logout } = useAuth()
-  const [userEmail, setUserEmail] = useState<string>('')
+  const { user } = useAuth()
   const [isSyncing, setIsSyncing] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
-
-  useEffect(() => {
-    // Get user info from token
-    const token = localStorage.getItem('gmail_access_token')
-    if (token) {
-      // In production, decode JWT to get user info
-      // For now, we'll just show a placeholder
-      setUserEmail('user@gmail.com')
-    }
-  }, [])
 
   const handleSync = async () => {
     if (!isSyncing) {
@@ -75,37 +65,38 @@ export function Header() {
         <button className="text-sm text-muted-foreground hover:text-foreground">
           Settings
         </button>
-        <div className="relative">
-          <button 
-            className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-medium text-white relative z-10"
-            onClick={(e) => {
-              e.stopPropagation()
-              const dropdown = e.currentTarget.nextElementSibling
-              if (dropdown) {
-                dropdown.classList.toggle('hidden')
-              }
-            }}
-            aria-label="User menu"
-          >
-            {userEmail.charAt(0).toUpperCase()}
-          </button>
-          <div className="hidden absolute right-0 mt-2 w-48 bg-background border border-border rounded-md shadow-lg z-50">
-            <div className="p-3 border-b border-border">
-              <p className="text-sm font-medium truncate">{userEmail}</p>
-              <p className="text-xs text-muted-foreground">Gmail Account</p>
-            </div>
-            <button
+        {user && (
+          <div className="relative">
+            <button 
+              className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-medium text-white relative z-10"
               onClick={(e) => {
                 e.stopPropagation()
-                logout()
+                const dropdown = e.currentTarget.nextElementSibling
+                if (dropdown) {
+                  dropdown.classList.toggle('hidden')
+                }
               }}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
-              aria-label="Sign out"
+              aria-label="User menu"
             >
-              Sign out
+              {(user.email || 'U').charAt(0).toUpperCase()}
             </button>
+            <div className="hidden absolute right-0 mt-2 w-48 bg-background border border-border rounded-md shadow-lg z-50">
+              <div className="p-3 border-b border-border">
+                <p className="text-sm font-medium truncate">{user.email}</p>
+                <p className="text-xs text-muted-foreground">Email Account</p>
+              </div>
+              <form action={logout}>
+                <button
+                  type="submit"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                  aria-label="Sign out"
+                >
+                  Sign out
+                </button>
+              </form>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </header>
   )

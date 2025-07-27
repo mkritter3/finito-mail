@@ -2,22 +2,26 @@
 
 import { Button, Separator, Badge } from '@finito/ui'
 import { X, Mail, MailOpen, Archive, Trash2, Loader2 } from 'lucide-react'
-import { useBulkActions } from '@/hooks/use-bulk-actions'
 import { useEmailStore } from '@/stores/email-store'
 
-export function BulkActionsToolbar() {
-  const { clearSelection } = useEmailStore()
-  const {
-    loading,
-    error,
-    selectedCount,
-    hasSelection,
-    markAsRead,
-    markAsUnread,
-    archive,
-    deleteEmails,
-    clearError
-  } = useBulkActions()
+interface BulkActionsToolbarProps {
+  onArchive: () => void
+  onMarkAsRead: () => void
+  onMarkAsUnread: () => void
+  onDelete: () => void
+  isPending: boolean
+}
+
+export function BulkActionsToolbar({
+  onArchive,
+  onMarkAsRead,
+  onMarkAsUnread,
+  onDelete,
+  isPending
+}: BulkActionsToolbarProps) {
+  const { selectedEmailIds, clearSelection } = useEmailStore()
+  const selectedCount = selectedEmailIds.size
+  const hasSelection = selectedCount > 0
 
   if (!hasSelection) {
     return null
@@ -47,11 +51,11 @@ export function BulkActionsToolbar() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={markAsRead}
-          disabled={loading}
+          onClick={onMarkAsRead}
+          disabled={isPending}
           className="h-8 px-3 hover:bg-blue-100"
         >
-          {loading ? (
+          {isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <MailOpen className="h-4 w-4" />
@@ -62,11 +66,11 @@ export function BulkActionsToolbar() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={markAsUnread}
-          disabled={loading}
+          onClick={onMarkAsUnread}
+          disabled={isPending}
           className="h-8 px-3 hover:bg-blue-100"
         >
-          {loading ? (
+          {isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Mail className="h-4 w-4" />
@@ -77,11 +81,11 @@ export function BulkActionsToolbar() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={archive}
-          disabled={loading}
+          onClick={onArchive}
+          disabled={isPending}
           className="h-8 px-3 hover:bg-blue-100"
         >
-          {loading ? (
+          {isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Archive className="h-4 w-4" />
@@ -92,11 +96,11 @@ export function BulkActionsToolbar() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={deleteEmails}
-          disabled={loading}
+          onClick={onDelete}
+          disabled={isPending}
           className="h-8 px-3 hover:bg-red-100 text-red-700"
         >
-          {loading ? (
+          {isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Trash2 className="h-4 w-4" />
@@ -104,24 +108,6 @@ export function BulkActionsToolbar() {
           <span className="ml-1">Delete</span>
         </Button>
       </div>
-
-      {/* Error message */}
-      {error && (
-        <>
-          <Separator orientation="vertical" className="h-6" />
-          <div className="flex items-center gap-2 text-red-600">
-            <span className="text-sm">{error}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearError}
-              className="h-6 w-6 p-0 hover:bg-red-100"
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        </>
-      )}
     </div>
   )
 }

@@ -1,0 +1,9 @@
+# Page snapshot
+
+```yaml
+- alert
+- heading "Sign in to Finito Mail" [level=2]
+- paragraph: Fast, private email that works offline
+- button "Continue with Google"
+- paragraph: By continuing, you agree to our Terms of Service and Privacy Policy.
+```

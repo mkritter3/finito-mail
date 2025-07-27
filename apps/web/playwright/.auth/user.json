@@ -6,19 +6,23 @@
       "localStorage": [
         {
           "name": "gmail_token_expires",
-          "value": "1753249139646"
+          "value": "1753644022"
         },
         {
           "name": "finito_auth_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlMmVfdGVzdF91c2VyXzEyMyIsImVtYWlsIjoiZTJlLnRlc3RAZXhhbXBsZS5jb20iLCJuYW1lIjoiRTJFIFRlc3QgVXNlciIsInBpY3R1cmUiOiJodHRwczovL3ZpYS5wbGFjZWhvbGRlci5jb20vMTUwIiwidmVyaWZpZWRfZW1haWwiOnRydWUsImlzTW9ja1VzZXIiOnRydWUsImNyZWF0ZWRBdCI6MTc1MzI0NTUzOTY0NCwiaWF0IjoxNzUzMjQ1NTM5LCJleHAiOjE3NTMyNDkxMzksImF1ZCI6ImZpbml0by1tYWlsLWFwcCIsImlzcyI6ImZpbml0by1tYWlsLXRlc3QifQ.JKKkmpaMygn86TZXD9L9gpMcj-n43jIhT48zsf_Q2iU"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlMmVfdGVzdF91c2VyXzEyMyIsImVtYWlsIjoiZTJlLnRlc3RAZXhhbXBsZS5jb20iLCJuYW1lIjoiRTJFIFRlc3QgVXNlciIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImV4cCI6MTc1MzY0NDAyMiwiaWF0IjoxNzUzNjQwNDIyfQ.EhdTOrZ3ZC9AJwKp4ekoDTvyE5uGRjp2Kvty8hFkeoU"
         },
         {
           "name": "gmail_refresh_token",
-          "value": "mock_refresh_1753245539646"
+          "value": "mock_gmail_refresh_token_1753640422877"
+        },
+        {
+          "name": "sb-localhost-auth-token",
+          "value": "{\"currentSession\":{\"access_token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlMmVfdGVzdF91c2VyXzEyMyIsImVtYWlsIjoiZTJlLnRlc3RAZXhhbXBsZS5jb20iLCJuYW1lIjoiRTJFIFRlc3QgVXNlciIsImF1ZCI6ImF1dGhlbnRpY2F0ZWQiLCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImV4cCI6MTc1MzY0NDAyMiwiaWF0IjoxNzUzNjQwNDIyfQ.EhdTOrZ3ZC9AJwKp4ekoDTvyE5uGRjp2Kvty8hFkeoU\",\"token_type\":\"bearer\",\"expires_in\":3600,\"expires_at\":1753644022,\"refresh_token\":\"mock_gmail_refresh_token_1753640422877\",\"user\":{\"id\":\"e2e_test_user_123\",\"email\":\"e2e.test@example.com\",\"name\":\"E2E Test User\",\"picture\":\"https://ui-avatars.com/api/?name=E2E%20Test%20User\",\"verified_email\":true},\"provider_token\":\"mock_gmail_access_token_1753640422877\",\"provider_refresh_token\":\"mock_gmail_refresh_token_1753640422877\"},\"expiresAt\":1753644022}"
         },
         {
           "name": "gmail_access_token",
-          "value": "mock_gmail_1753245539646_e2e.test_at_example.com"
+          "value": "mock_gmail_access_token_1753640422877"
         }
       ]
     }

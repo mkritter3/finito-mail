@@ -25,6 +25,9 @@ export default defineConfig({
     ['line']
   ],
   
+  /* Global setup */
+  globalSetup: require.resolve('./tests/global-setup'),
+  
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -112,13 +115,10 @@ export default defineConfig({
     env: {
       // Use test environment variables
       PORT: '3001',
-      E2E_TESTING: 'true',
-      JWT_SECRET: 'test-secret-for-e2e-testing-do-not-use-in-production',
-      NEXTAUTH_SECRET: 'test-secret-for-e2e-testing-do-not-use-in-production',
       NEXT_PUBLIC_BASE_URL: 'http://localhost:3001',
-      GOOGLE_CLIENT_ID: 'mock-client-id',
-      GOOGLE_CLIENT_SECRET: 'mock-client-secret',
-      NEXT_PUBLIC_GOOGLE_CLIENT_ID: 'mock-client-id',
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-anon-key',
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-key',
       NODE_ENV: 'development',
       LOG_LEVEL: 'debug',
       NEXT_TELEMETRY_DISABLED: '1',
