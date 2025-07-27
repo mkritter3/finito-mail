@@ -17,15 +17,15 @@ const SyncEmailsSchema = z.object({
  * This runs on the server side and can safely import Gmail API libraries
  */
 export async function syncRecentEmails(count: number = 5): Promise<ServerActionResult<SyncResult>> {
-  logger.info({ action: 'syncRecentEmails', count }, 'Starting email sync')
+  logger.info('Starting email sync', { action: 'syncRecentEmails', count })
 
   // Validate input
   const validation = SyncEmailsSchema.safeParse({ count })
   if (!validation.success) {
-    logger.warn({ 
+    logger.warn('Validation failed', { 
       action: 'syncRecentEmails', 
       errors: validation.error.flatten().fieldErrors 
-    }, 'Validation failed')
+    })
     return { 
       data: null, 
       error: 'Invalid input parameters',
@@ -37,7 +37,7 @@ export async function syncRecentEmails(count: number = 5): Promise<ServerActionR
 
   try {
     await emailSync.syncRecentEmails(validatedCount)
-    logger.info({ action: 'syncRecentEmails', count: validatedCount }, 'Email sync completed successfully')
+    logger.info('Email sync completed successfully', { action: 'syncRecentEmails', count: validatedCount })
     return { 
       data: { 
         success: true, 
@@ -48,11 +48,11 @@ export async function syncRecentEmails(count: number = 5): Promise<ServerActionR
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    logger.error({ 
+    logger.error('Email sync failed', { 
       action: 'syncRecentEmails', 
       count: validatedCount, 
       error: { message: errorMessage, stack: error instanceof Error ? error.stack : undefined } 
-    }, 'Email sync failed')
+    })
     return { 
       data: null, 
       error: 'Failed to sync emails. Please try again.',
@@ -66,21 +66,21 @@ export async function syncRecentEmails(count: number = 5): Promise<ServerActionR
  * This runs on the server side and can safely access authentication services
  */
 export async function checkAuthentication(): Promise<ServerActionResult<{ authenticated: boolean }>> {
-  logger.info({ action: 'checkAuthentication' }, 'Checking user authentication')
+  logger.info('Checking user authentication', { action: 'checkAuthentication' })
 
   try {
     const isAuthenticated = await emailSync.isAuthenticated()
-    logger.info({ action: 'checkAuthentication', authenticated: isAuthenticated }, 'Authentication check completed')
+    logger.info('Authentication check completed', { action: 'checkAuthentication', authenticated: isAuthenticated })
     return { 
       data: { authenticated: isAuthenticated }, 
       error: null 
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    logger.error({ 
+    logger.error('Authentication check failed', { 
       action: 'checkAuthentication', 
       error: { message: errorMessage, stack: error instanceof Error ? error.stack : undefined } 
-    }, 'Authentication check failed')
+    })
     return { 
       data: null, 
       error: 'Failed to check authentication status',
@@ -100,15 +100,15 @@ const SyncFolderSchema = z.object({
  * This runs on the server side and can safely import Gmail API libraries
  */
 export async function syncFolder(folder: string = 'INBOX', maxResults: number = 50): Promise<ServerActionResult<SyncResult>> {
-  logger.info({ action: 'syncFolder', folder, maxResults }, 'Starting folder sync')
+  logger.info('Starting folder sync', { action: 'syncFolder', folder, maxResults })
 
   // Validate input
   const validation = SyncFolderSchema.safeParse({ folder, maxResults })
   if (!validation.success) {
-    logger.warn({ 
+    logger.warn('Validation failed', { 
       action: 'syncFolder', 
       errors: validation.error.flatten().fieldErrors 
-    }, 'Validation failed')
+    })
     return { 
       data: null, 
       error: 'Invalid input parameters',
@@ -120,7 +120,7 @@ export async function syncFolder(folder: string = 'INBOX', maxResults: number = 
 
   try {
     await emailSync.syncFolder(validatedFolder, validatedMaxResults)
-    logger.info({ action: 'syncFolder', folder: validatedFolder, maxResults: validatedMaxResults }, 'Folder sync completed successfully')
+    logger.info('Folder sync completed successfully', { action: 'syncFolder', folder: validatedFolder, maxResults: validatedMaxResults })
     return { 
       data: { 
         success: true, 
@@ -131,12 +131,12 @@ export async function syncFolder(folder: string = 'INBOX', maxResults: number = 
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    logger.error({ 
+    logger.error('Folder sync failed', { 
       action: 'syncFolder', 
       folder: validatedFolder, 
       maxResults: validatedMaxResults, 
       error: { message: errorMessage, stack: error instanceof Error ? error.stack : undefined } 
-    }, 'Folder sync failed')
+    })
     return { 
       data: null, 
       error: 'Failed to sync folder. Please try again.',
@@ -173,15 +173,15 @@ export async function sendEmail(emailData: {
   body: string
   threadId?: string
 }): Promise<ServerActionResult<SendEmailResult>> {
-  logger.info({ action: 'sendEmail', to: emailData.to, subject: emailData.subject }, 'Starting email send')
+  logger.info('Starting email send', { action: 'sendEmail', to: emailData.to, subject: emailData.subject })
 
   // Validate input
   const validation = SendEmailSchema.safeParse(emailData)
   if (!validation.success) {
-    logger.warn({ 
+    logger.warn('Email validation failed', { 
       action: 'sendEmail', 
       errors: validation.error.flatten().fieldErrors 
-    }, 'Email validation failed')
+    })
     return { 
       data: null, 
       error: 'Invalid email data',
@@ -217,13 +217,13 @@ export async function sendEmail(emailData: {
       threadId: validatedData.threadId
     })
 
-    logger.info({ 
+    logger.info('Email sent successfully', { 
       action: 'sendEmail', 
       to: validatedData.to, 
       subject: validatedData.subject, 
       messageId: result.id,
       threadId: result.threadId
-    }, 'Email sent successfully')
+    })
 
     return { 
       data: { 
@@ -235,12 +235,12 @@ export async function sendEmail(emailData: {
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    logger.error({ 
+    logger.error('Email send failed', { 
       action: 'sendEmail', 
       to: validatedData.to, 
       subject: validatedData.subject, 
       error: { message: errorMessage, stack: error instanceof Error ? error.stack : undefined } 
-    }, 'Email send failed')
+    })
     return { 
       data: null, 
       error: 'Failed to send email. Please try again.',

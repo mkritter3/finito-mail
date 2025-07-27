@@ -60,24 +60,24 @@ self.addEventListener('message', async (event) => {
     });
   } catch (error) {
     // Send error response
-    console.log(`[Auth Worker ${workerId}] Sending ERROR response for ${type} (id: ${id}): ${error.message}`);
+    console.log(`[Auth Worker ${workerId}] Sending ERROR response for ${type} (id: ${id}): ${error instanceof Error ? error.message : String(error)}`);
     self.postMessage({
       type: 'ERROR',
       id,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     });
   }
 });
 
 // Store tokens securely in memory
-async function storeTokens({ provider, tokens }) {
+async function storeTokens({ provider, tokens }: { provider: string, tokens: { accessToken: string, refreshToken?: string, expiresIn?: number } }) {
   const { accessToken, refreshToken, expiresIn } = tokens;
   
   console.log(`[Auth Worker ${workerId}] Storing tokens for provider: ${provider}`);
   console.log(`[Auth Worker ${workerId}] Token info: hasAccess=${!!accessToken}, hasRefresh=${!!refreshToken}, expiresIn=${expiresIn}`);
   
   // Calculate expiry time
-  const expiresAt = Date.now() + (expiresIn * 1000);
+  const expiresAt = expiresIn ? Date.now() + (expiresIn * 1000) : Date.now() + (3600 * 1000); // Default 1 hour
   
   tokenStore.set(provider, {
     accessToken,
@@ -92,7 +92,7 @@ async function storeTokens({ provider, tokens }) {
 }
 
 // Get access token (with automatic refresh if needed)
-async function getAccessToken({ provider }) {
+async function getAccessToken({ provider }: { provider: string }) {
   console.log(`[Auth Worker ${workerId}] Getting access token for provider: ${provider}`);
   console.log(`[Auth Worker ${workerId}] Token store size: ${tokenStore.size}`);
   console.log(`[Auth Worker ${workerId}] Available providers: ${Array.from(tokenStore.keys()).join(', ')}`);
@@ -125,7 +125,7 @@ async function getAccessToken({ provider }) {
 }
 
 // Clear tokens for a provider
-async function clearTokens({ provider }) {
+async function clearTokens({ provider }: { provider: string }) {
   if (provider) {
     tokenStore.delete(provider);
   } else {
@@ -137,7 +137,7 @@ async function clearTokens({ provider }) {
 }
 
 // Check authentication status
-async function checkAuth({ provider }) {
+async function checkAuth({ provider }: { provider: string }) {
   const tokens = tokenStore.get(provider);
   
   if (!tokens) {

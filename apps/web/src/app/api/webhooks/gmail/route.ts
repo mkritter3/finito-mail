@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createScopedLogger } from '@/lib/logger'
 import * as Sentry from '@sentry/nextjs'
-import { createHmac, timingSafeEqual, randomUUID } from 'crypto'
+import { timingSafeEqual, randomUUID } from 'crypto'
 import { SSEMessageType } from '@/app/api/sse/email-updates/route'
 import { getPublisherClient } from '@/lib/redis-pubsub'
 import { createClient } from '@supabase/supabase-js'
@@ -128,10 +128,8 @@ async function processGmailNotification(notification: GmailNotification) {
     // Acquire distributed lock to prevent concurrent processing for same user
     const lockKey = `lock:gmail_sync:${notification.emailAddress}`
     const lockValue = randomUUID() // Unique value for this lock instance
-    const lockAcquired = await publisher.set(lockKey, lockValue, {
-      NX: true, // Only set if key doesn't exist
-      EX: 300,  // Expire after 5 minutes to prevent deadlocks
-    })
+    // @ts-ignore - ioredis v5 TypeScript overload issue with NX and EX together
+    const lockAcquired = await publisher.set(lockKey, lockValue, 'NX', 'EX', 300)
     
     if (!lockAcquired) {
       logger.warn('Sync already in progress for user, skipping notification', {
@@ -174,7 +172,10 @@ async function processGmailNotification(notification: GmailNotification) {
     })
     
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
-    const gmailClient = new GmailClientEnhanced()
+    const gmailClient = new GmailClientEnhanced({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!
+    })
     
     // Get the last known history ID from database
     const { data: lastSync } = await supabase
@@ -198,7 +199,7 @@ async function processGmailNotification(notification: GmailNotification) {
       let isFirstPage = true
       
       do {
-        const history = await gmail.users.history.list({
+        const history: any = await gmail.users.history.list({
           userId: 'me',
           // Only include startHistoryId on the first page request
           startHistoryId: isFirstPage ? lastHistoryId : undefined,
@@ -370,10 +371,7 @@ async function processGmailNotification(notification: GmailNotification) {
       `
       
       try {
-        await publisher.eval(LUA_SCRIPT, {
-          keys: [lockKey],
-          arguments: [lockValue]
-        })
+        await publisher.eval(LUA_SCRIPT, 1, lockKey, lockValue)
       } catch (e) {
         logger.error('Failed to release Redis lock', { 
           error: e, 
@@ -474,7 +472,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Mark as processed with 5-minute TTL
-      await publisher.set(dedupeKey, '1', { EX: 300 })
+      await publisher.set(dedupeKey, '1', 'EX', 300)
     }
     
     // Decode the notification data

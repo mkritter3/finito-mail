@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { google } from 'googleapis'
@@ -10,7 +10,7 @@ const logger = createScopedLogger('gmail.watch')
 // Gmail watch request expires after 7 days, renew after 6 days
 const WATCH_EXPIRATION_MS = 6 * 24 * 60 * 60 * 1000
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   const timer = logger.time('setup-gmail-watch')
   
   try {
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Check watch status
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const cookieStore = cookies()
     const supabase = createServerClient(

@@ -16,8 +16,7 @@ Sentry.init({
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
   
-  // Release Health
-  autoSessionTracking: true,
+  // Session tracking is enabled by default in newer versions
   
   // Integrations
   integrations: [
@@ -77,12 +76,16 @@ Sentry.init({
       const error = hint.originalException
       
       // Don't log errors from browser extensions
-      if (error && error.stack && error.stack.match(/chrome-extension:|moz-extension:/)) {
+      if (error && typeof error === 'object' && 'stack' in error && 
+          typeof error.stack === 'string' && 
+          error.stack.match(/chrome-extension:|moz-extension:/)) {
         return null
       }
       
       // Don't log ResizeObserver errors (common and not actionable)
-      if (error && error.message && error.message.includes('ResizeObserver')) {
+      if (error && typeof error === 'object' && 'message' in error && 
+          typeof error.message === 'string' && 
+          error.message.includes('ResizeObserver')) {
         return null
       }
     }

@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test'
 import { login, logout, isAuthenticated } from './helpers/auth'
-import mockMessages from './fixtures/gmail-messages.json'
 
 test.describe('Authentication Flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -160,7 +159,7 @@ test.describe('Gmail Integration with Mocked APIs', () => {
     // Since it's empty, we need to wait for the loading state to disappear
     await page.waitForFunction(() => {
       const spinner = document.querySelector('.animate-spin')
-      return !spinner || spinner.offsetParent === null
+      return !spinner || (spinner as HTMLElement).offsetParent === null
     }, { timeout: 5000 })
 
     // Verify we're on the mail page

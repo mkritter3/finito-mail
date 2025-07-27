@@ -106,14 +106,14 @@ export function createScopedLogger(context: string) {
     time: (label: string) => {
       const start = Date.now()
       
-      // Get the currently active transaction (from auto-instrumentation or manual)
-      const activeTransaction = Sentry.getActiveTransaction()
+      // Get the currently active span (from auto-instrumentation or manual)
+      const activeSpan = Sentry.getActiveSpan()
       
-      // Create a child span if a transaction exists, otherwise no-op for tracing
-      const span = activeTransaction?.startChild({
+      // Create a child span if an active span exists
+      const span = activeSpan ? Sentry.startInactiveSpan({
         op: 'function',
-        description: `${context}.${label}`,
-      })
+        name: `${context}.${label}`,
+      }) : undefined
       
       return {
         end: (meta?: Record<string, any>) => {
@@ -125,17 +125,17 @@ export function createScopedLogger(context: string) {
             ...meta,
           })
           
-          // Finish the span if it exists
-          span?.finish()
+          // End the span if it exists
+          span?.end()
           
           // Log slow operations to Sentry
           if (duration > 1000) {
             // Add data to the span for better context
-            span?.setTag('slow', 'true')
-            span?.setData('duration_ms', duration)
+            span?.setAttribute('slow', 'true')
+            span?.setAttribute('duration_ms', duration)
             if (meta) {
               Object.entries(meta).forEach(([key, value]) => {
-                span?.setData(key, value)
+                span?.setAttribute(key, String(value))
               })
             }
             
@@ -177,11 +177,11 @@ export function withLogging<T extends (...args: any[]) => any>(
     const requestId = crypto.randomUUID()
     const requestLogger = createScopedLogger(options?.context || 'api')
     
-    // Get the active transaction that Sentry auto-instrumentation created
-    const transaction = Sentry.getActiveTransaction()
+    // Get the active span that Sentry auto-instrumentation created
+    const activeSpan = Sentry.getActiveSpan()
     const scope = Sentry.getCurrentScope()
     
-    // Add custom context to the existing transaction
+    // Add custom context to the existing scope
     scope.setTag('requestId', requestId)
     scope.setContext('request_details', { 
       requestId,
@@ -189,10 +189,10 @@ export function withLogging<T extends (...args: any[]) => any>(
       context: options?.context || 'api'
     })
     
-    // If there's a transaction, we can also add custom data
-    if (transaction) {
-      transaction.setData('requestId', requestId)
-      transaction.setData('handler', options?.name || handler.name || 'anonymous')
+    // If there's an active span, we can also add custom data
+    if (activeSpan) {
+      activeSpan.setAttribute('requestId', requestId)
+      activeSpan.setAttribute('handler', options?.name || handler.name || 'anonymous')
     }
 
     try {

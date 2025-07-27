@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
 import { createScopedLogger } from '@/lib/logger'
-import * as Sentry from '@sentry/nextjs'
 import { createSubscriberClient } from '@/lib/redis-pubsub'
 import type { Redis } from 'ioredis'
 
@@ -90,7 +89,8 @@ export async function GET(request: NextRequest) {
         }
         
         // Subscribe to user's channel
-        await subscriber!.subscribe(channel, handleMessage)
+        subscriber!.on('message', handleMessage)
+        await subscriber!.subscribe(channel)
         logger.debug('Subscribed to Redis channel', { channel })
         
         // Send initial connection message

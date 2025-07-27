@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
 import { timingSafeEqual } from 'crypto'
@@ -66,7 +66,7 @@ function getRedisClient() {
   return redisClient
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const headersList = headers()
   const providedKey = headersList.get('x-health-api-key')
   const expectedKey = process.env.HEALTH_CHECK_API_KEY
@@ -226,7 +226,7 @@ export async function GET(request: NextRequest) {
   if (health.status !== 'healthy') {
     Sentry.captureMessage(`Health check ${health.status}`, {
       level: health.status === 'unhealthy' ? 'error' : 'warning',
-      extra: health
+      extra: health as Record<string, any>
     })
   }
 

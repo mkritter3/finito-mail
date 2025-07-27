@@ -43,7 +43,7 @@ test.describe('Smoke Tests', () => {
           data: res.ok ? await res.json() : await res.text()
         }
       } catch (error) {
-        return { error: error.message }
+        return { error: error instanceof Error ? error.message : String(error) }
       }
     })
     

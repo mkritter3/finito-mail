@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
 import { useEmailUpdates } from './use-email-updates'
-import { useFallbackPolling } from './use-fallback-polling'
 import { createScopedLogger } from '@/lib/logger'
 
 const logger = createScopedLogger('use-real-time-sync')
@@ -23,7 +22,6 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
   } = options
   
   const [useFallback, setUseFallback] = useState(false)
-  const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastSSEActivityRef = useRef<number>(Date.now())
   
   // SSE connection
@@ -45,13 +43,6 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
       lastSSEActivityRef.current = Date.now()
       sseOptions.onSyncComplete?.()
     }
-  })
-  
-  // Fallback polling
-  const { startPolling, stopPolling } = useFallbackPolling({
-    enabled: useFallback,
-    pollInterval,
-    onError: options.onError
   })
   
   // Monitor SSE connection and activate fallback if needed
@@ -94,9 +85,6 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
       setUseFallback(false)
       reconnect()
     },
-    disconnect: () => {
-      disconnect()
-      stopPolling()
-    }
+    disconnect
   }
 }
