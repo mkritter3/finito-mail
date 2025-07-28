@@ -4,6 +4,7 @@ import './globals.css'
 import { Providers } from './providers'
 import { createClient } from '@/lib/supabase/server'
 import { AuthProvider } from '@/components/auth/auth-provider'
+import { Toaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -30,6 +31,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <AuthProvider user={user}>
           <Providers>{children}</Providers>
         </AuthProvider>
+        <Toaster 
+          position="top-right"
+          theme="dark"
+          richColors
+          closeButton
+        />
       </body>
     </html>
   )

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { AuthError } from '@/lib/auth-errors'
 
 export type BulkAction =
   | 'mark_read'
@@ -47,18 +48,12 @@ export async function performBulkEmailAction(
   } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    return {
-      success: false,
-      processed: 0,
-      successful: 0,
-      failed: emailIds.length,
-      results: [],
-      errors: emailIds.map(id => ({
-        emailId: id,
-        success: false,
-        error: 'Authentication required',
-      })),
-    }
+    // Throw AuthError for proper error handling in UI
+    throw new AuthError(
+      'Your session has expired. Please sign in again.',
+      'SESSION_EXPIRED',
+      authError
+    )
   }
 
   // Validate request

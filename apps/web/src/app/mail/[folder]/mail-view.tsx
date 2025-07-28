@@ -6,6 +6,7 @@ import { EmailView } from '@/components/email-view'
 import { BulkActionsToolbar } from '@/components/bulk-actions-toolbar'
 import { useEmailStore } from '@/stores/email-store'
 import { useBulkMailActions } from '@/hooks/use-bulk-mail-actions'
+import { useAuthErrorHandler } from '@/hooks/use-auth-error-handler'
 
 export interface EmailMetadata {
   id: string
@@ -67,6 +68,7 @@ export function MailView({ initialEmails, folder }: MailViewProps) {
   const { selectedEmailIds, clearSelection } = useEmailStore()
   const selectedEmailId = useEmailStore(state => state.selectedEmailId)
   const { archive, markAsRead, markAsUnread, deleteEmails } = useBulkMailActions()
+  const { handleError } = useAuthErrorHandler()
 
   // Handler functions that apply optimistic updates then call server actions
   const handleArchive = () => {
@@ -84,7 +86,7 @@ export function MailView({ initialEmails, folder }: MailViewProps) {
         clearSelection()
       } catch (error) {
         // Optimistic update will auto-revert on error
-        console.error('Archive failed:', error)
+        handleError(error)
       }
     })
   }
@@ -100,7 +102,7 @@ export function MailView({ initialEmails, folder }: MailViewProps) {
         await markAsRead(ids)
         clearSelection()
       } catch (error) {
-        console.error('Mark as read failed:', error)
+        handleError(error)
       }
     })
   }
@@ -116,7 +118,7 @@ export function MailView({ initialEmails, folder }: MailViewProps) {
         await markAsUnread(ids)
         clearSelection()
       } catch (error) {
-        console.error('Mark as unread failed:', error)
+        handleError(error)
       }
     })
   }
@@ -132,7 +134,7 @@ export function MailView({ initialEmails, folder }: MailViewProps) {
         await deleteEmails(ids)
         clearSelection()
       } catch (error) {
-        console.error('Delete failed:', error)
+        handleError(error)
       }
     })
   }
