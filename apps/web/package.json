@@ -16,7 +16,7 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "playwright:install": "playwright install",
-    "test:rls": "playwright test tests/security/rls-policies.spec.ts",
+    "test:rls": "playwright test tests/security/rls-comprehensive-test.spec.ts",
     "test:rls:setup": "tsx scripts/setup-rls-test-users.ts"
   },
   "dependencies": {
