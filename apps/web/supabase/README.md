@@ -8,7 +8,12 @@ This directory contains SQL migrations and scripts for the Finito Mail database.
 
 ### Migration Files
 
-1. **`migrations/002_implement_rls_policies.sql`** - Implements RLS for all user data tables
+1. **`migrations/001_create_tables.sql`** - Creates initial database schema
+   - Creates all required tables: `emails`, `rules`, `gmail_credentials`, `email_sync_state`, `gmail_watch_subscriptions`
+   - Sets up indexes for performance
+   - Creates triggers for updated_at timestamps
+
+2. **`migrations/002_implement_rls_policies.sql`** - Implements RLS for all user data tables
    - Enables RLS on: `emails`, `rules`, `gmail_credentials`, `email_sync_state`
    - Creates granular policies for SELECT, INSERT, UPDATE, DELETE
    - Includes WITH CHECK constraints to prevent user_id spoofing
@@ -18,9 +23,10 @@ This directory contains SQL migrations and scripts for the Finito Mail database.
 #### Option 1: Via Supabase Dashboard (Recommended)
 1. Go to your Supabase project dashboard
 2. Navigate to SQL Editor
-3. Copy the contents of `migrations/002_implement_rls_policies.sql`
-4. Run the migration
-5. Verify success message: "RLS successfully enabled on all tables"
+3. **First Migration**: Create a new query, paste `migrations/001_create_tables.sql`, and run it
+   - Verify: "All tables created successfully"
+4. **Second Migration**: Create another new query, paste `migrations/002_implement_rls_policies.sql`, and run it
+   - Verify: "RLS successfully enabled on all tables"
 
 #### Option 2: Via Supabase CLI
 ```bash
