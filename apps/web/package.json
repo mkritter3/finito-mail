@@ -22,7 +22,10 @@
     "rls:phase1:baseline": "tsx scripts/rls-phase1-baseline-simple.ts",
     "rls:phase2:generate-migration": "tsx scripts/generate-rls-migration.ts",
     "rls:phase2:verify": "tsx scripts/rls-phase2-verify.ts",
-    "rls:generate-test-data": "tsx scripts/generate-test-data-sql.ts"
+    "rls:generate-test-data": "tsx scripts/generate-test-data-sql.ts",
+    "demo:create-users": "tsx scripts/create-demo-users-local.ts",
+    "demo:setup-rls": "tsx scripts/setup-local-rls.ts",
+    "demo:setup": "npm run demo:setup-rls && npm run demo:create-users"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
