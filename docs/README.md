@@ -10,8 +10,6 @@ Welcome to the Finito Mail documentation! This is your comprehensive guide to un
 Everything you need to begin working with Finito Mail.
 - [Environment Setup](./getting-started/environment-setup.md) - Initial development environment configuration
 - [Environment Variables Setup](./getting-started/ENVIRONMENT_VARIABLES_SETUP.md) - Complete environment variable reference
-- [Supabase OAuth Setup](./getting-started/SUPABASE_OAUTH_SETUP.md) - Authentication configuration guide
-- [Google OAuth Setup](./getting-started/SUPABASE_GOOGLE_OAUTH_SETUP.md) - Google provider configuration
 
 ### 🏗️ [Architecture](./architecture/)
 Deep dive into the system design and technical decisions.
@@ -75,6 +73,11 @@ Solutions to common issues and frequently asked questions.
 - **[General FAQ](./troubleshooting/faq/general.md)** - General questions about Finito Mail
 - **[Technical FAQ](./troubleshooting/faq/technical.md)** - Technical and development questions
 - **[Security FAQ](./troubleshooting/faq/security.md)** - Security and privacy concerns
+- **[Security Incident 2025-01-28](./troubleshooting/security-incident-2025-01-28.md)** - Exposed secrets remediation
+
+### 🔒 [Security](./security/)
+Security best practices and guidelines.
+- **[Secrets Management](./security/secrets-management.md)** - Best practices for handling secrets
 
 ### 📈 [Roadmap](./roadmap/)
 Future plans and development timeline.
@@ -101,6 +104,7 @@ Product requirements, market analysis, and business strategy.
 - [Deployment Guide](./deployment/PRODUCTION_DEPLOYMENT.md)
 - [Monitoring Setup](./deployment/MONITORING_SETUP.md)
 - [CI/CD Guide](./deployment/CI_CD_COMPREHENSIVE_GUIDE.md)
+- [Secrets Management](./security/secrets-management.md)
 
 ### For Product/Business
 - [Business Overview](./BUSINESS_OVERVIEW.md)
