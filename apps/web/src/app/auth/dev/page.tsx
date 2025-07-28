@@ -46,7 +46,7 @@ export default function DevAuthPage() {
   const handleDemoLogin = async (demoEmail: string, demoPassword: string) => {
     setEmail(demoEmail)
     setPassword(demoPassword)
-    
+
     try {
       setIsLoading(true)
       setError(null)
@@ -94,7 +94,7 @@ export default function DevAuthPage() {
               Quick Demo Login
             </h3>
             <div className="space-y-2">
-              {DEMO_USERS.map((user) => (
+              {DEMO_USERS.map(user => (
                 <Button
                   key={user.email}
                   onClick={() => handleDemoLogin(user.email, user.password)}
@@ -114,14 +114,19 @@ export default function DevAuthPage() {
               <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gray-50 dark:bg-gray-900 text-gray-500">Or sign in manually</span>
+              <span className="px-2 bg-gray-50 dark:bg-gray-900 text-gray-500">
+                Or sign in manually
+              </span>
             </div>
           </div>
 
           {/* Manual Login Form */}
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
                 Email
               </label>
               <input
@@ -129,14 +134,17 @@ export default function DevAuthPage() {
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={e => setEmail(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-800 dark:border-gray-600"
                 placeholder="alice@demo.local"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
                 Password
               </label>
               <input
@@ -144,7 +152,7 @@ export default function DevAuthPage() {
                 type="password"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-800 dark:border-gray-600"
                 placeholder="demo123456"
               />
@@ -156,7 +164,10 @@ export default function DevAuthPage() {
           </form>
 
           <div className="text-center">
-            <a href="/auth" className="text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+            <a
+              href="/auth"
+              className="text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+            >
               Use Google OAuth instead →
             </a>
           </div>

@@ -11,7 +11,7 @@ export default function TestAuthPage() {
   const supabase = createClient()
 
   const addStatus = (message: string) => {
-    setStatus((prev) => [...prev, `${new Date().toISOString()}: ${message}`])
+    setStatus(prev => [...prev, `${new Date().toISOString()}: ${message}`])
   }
 
   useEffect(() => {
@@ -21,13 +21,13 @@ export default function TestAuthPage() {
 
   const testEmailSignIn = async () => {
     addStatus('Testing email sign in...')
-    
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
-      
+
       if (error) {
         addStatus(`❌ Error: ${error.message}`)
         addStatus(`   Code: ${error.code}`)
@@ -45,14 +45,14 @@ export default function TestAuthPage() {
 
   const testEmailSignUp = async () => {
     addStatus('Testing email sign up...')
-    
+
     try {
       const testEmail = `test-${Date.now()}@demo.local`
       const { data, error } = await supabase.auth.signUp({
         email: testEmail,
         password: 'test123456',
       })
-      
+
       if (error) {
         addStatus(`❌ Error: ${error.message}`)
         addStatus(`   Code: ${error.code}`)
@@ -68,9 +68,9 @@ export default function TestAuthPage() {
 
   const checkSession = async () => {
     addStatus('Checking session...')
-    
+
     const { data, error } = await supabase.auth.getSession()
-    
+
     if (error) {
       addStatus(`❌ Session error: ${error.message}`)
     } else {
@@ -96,7 +96,7 @@ export default function TestAuthPage() {
     <div className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold mb-8">Auth Test Page</h1>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Controls */}
           <div className="space-y-4">
@@ -105,47 +105,43 @@ export default function TestAuthPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={e => setEmail(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium mb-1">Password</label>
               <input
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Button onClick={testEmailSignIn} className="w-full">
                 Test Email Sign In
               </Button>
-              
+
               <Button onClick={testEmailSignUp} variant="outline" className="w-full">
                 Test Email Sign Up (New User)
               </Button>
-              
+
               <Button onClick={checkSession} variant="outline" className="w-full">
                 Check Session
               </Button>
-              
+
               <Button onClick={signOut} variant="outline" className="w-full">
                 Sign Out
               </Button>
-              
-              <Button 
-                onClick={() => setStatus([])} 
-                variant="ghost" 
-                className="w-full"
-              >
+
+              <Button onClick={() => setStatus([])} variant="ghost" className="w-full">
                 Clear Log
               </Button>
             </div>
-            
+
             <div className="text-sm text-gray-600 dark:text-gray-400">
               <p>Demo Users:</p>
               <ul className="ml-4 mt-1">
@@ -155,7 +151,7 @@ export default function TestAuthPage() {
               </ul>
             </div>
           </div>
-          
+
           {/* Status Log */}
           <div className="bg-black text-green-400 p-4 rounded-md font-mono text-xs overflow-auto h-96">
             {status.length === 0 ? (

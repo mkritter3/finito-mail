@@ -10,25 +10,25 @@ export async function updateSession(request: NextRequest) {
   // Check if we're in dev bypass mode
   if (isDevMode()) {
     const devAuthUser = request.cookies.get('dev-auth-user')?.value
-    
+
     if (devAuthUser && getDevUser(devAuthUser)) {
       // Valid dev session exists
       return supabaseResponse
     }
-    
+
     // No valid dev session, check if this is a protected route
-    const isProtectedRoute = 
+    const isProtectedRoute =
       !request.nextUrl.pathname.startsWith('/auth') &&
       !request.nextUrl.pathname.startsWith('/api/auth') &&
       !request.nextUrl.pathname.startsWith('/_next') &&
       !request.nextUrl.pathname.includes('.')
-    
+
     if (isProtectedRoute) {
       const url = request.nextUrl.clone()
       url.pathname = '/auth/dev'
       return NextResponse.redirect(url)
     }
-    
+
     return supabaseResponse
   }
 

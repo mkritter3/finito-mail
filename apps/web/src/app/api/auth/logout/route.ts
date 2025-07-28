@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { isDevMode } from '@/lib/auth/dev-auth'
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     if (isDevMode()) {
       // Clear dev auth cookie
       const cookieStore = await cookies()
       cookieStore.delete('dev-auth-user')
-      
+
       return NextResponse.json({ success: true })
     }
 
@@ -19,9 +19,6 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error('Logout error:', error)
-    return NextResponse.json(
-      { error: 'Failed to logout' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to logout' }, { status: 500 })
   }
 }

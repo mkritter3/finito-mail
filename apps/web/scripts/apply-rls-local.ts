@@ -95,7 +95,7 @@ SELECT * FROM pg_policies WHERE schemaname = 'public';
     console.log('\n🔍 Checking current RLS status...')
     
     // Try to query pg_tables through a function
-    const { data: rlsStatus, error } = await supabase.rpc('get_rls_status', {}, {
+    const { error } = await supabase.rpc('get_rls_status', {}, {
       count: 'exact'
     }).single()
 

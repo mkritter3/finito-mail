@@ -31,12 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <AuthProvider user={user}>
           <Providers>{children}</Providers>
         </AuthProvider>
-        <Toaster 
-          position="top-right"
-          theme="dark"
-          richColors
-          closeButton
-        />
+        <Toaster position="top-right" theme="dark" richColors closeButton />
       </body>
     </html>
   )

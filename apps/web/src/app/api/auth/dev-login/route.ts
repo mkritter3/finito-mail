@@ -13,14 +13,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const { email, password } = await request.json()
-    
+
     // Validate credentials against dev users
     const user = validateDevCredentials(email, password)
     if (!user) {
-      return NextResponse.json(
-        { error: 'Invalid credentials' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
     // Create a simple dev session
@@ -29,8 +26,8 @@ export async function POST(request: NextRequest) {
         id: user.id,
         email: email,
         name: user.name,
-        role: user.role
-      }
+        role: user.role,
+      },
     }
 
     // Set a cookie to track dev session
@@ -39,19 +36,15 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: false,
       sameSite: 'lax',
-      maxAge: 3600 * 24 // 24 hours for dev
+      maxAge: 3600 * 24, // 24 hours for dev
     })
 
     return NextResponse.json({
       ...devSession,
-      message: 'Signed in via development bypass'
+      message: 'Signed in via development bypass',
     })
-
   } catch (error) {
     console.error('Dev login error:', error)
-    return NextResponse.json(
-      { error: 'Failed to process login' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to process login' }, { status: 500 })
   }
 }

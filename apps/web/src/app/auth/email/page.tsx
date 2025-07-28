@@ -21,7 +21,7 @@ export default function EmailAuthPage() {
     setSuccess(null)
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -36,8 +36,8 @@ export default function EmailAuthPage() {
             options: {
               data: {
                 skip_email_verification: true,
-              }
-            }
+              },
+            },
           })
 
           if (!signUpError && signUpData.session) {
@@ -86,7 +86,10 @@ export default function EmailAuthPage() {
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
                 Email
               </label>
               <input
@@ -96,14 +99,17 @@ export default function EmailAuthPage() {
                 autoComplete="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={e => setEmail(e.target.value)}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm dark:bg-gray-800"
                 placeholder="alice@demo.local"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
                 Password
               </label>
               <input
@@ -113,7 +119,7 @@ export default function EmailAuthPage() {
                 autoComplete="current-password"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm dark:bg-gray-800"
                 placeholder="demo123456"
               />
@@ -132,9 +138,7 @@ export default function EmailAuthPage() {
           </div>
 
           <div className="space-y-2 text-center text-sm">
-            <p className="text-gray-600 dark:text-gray-400">
-              Demo accounts:
-            </p>
+            <p className="text-gray-600 dark:text-gray-400">Demo accounts:</p>
             <div className="space-y-1 text-xs">
               <p>alice@demo.local / demo123456</p>
               <p>bob@demo.local / demo123456</p>
@@ -143,7 +147,10 @@ export default function EmailAuthPage() {
           </div>
 
           <div className="text-center">
-            <a href="/auth/dev" className="text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+            <a
+              href="/auth/dev"
+              className="text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+            >
               ← Back to dev auth
             </a>
           </div>

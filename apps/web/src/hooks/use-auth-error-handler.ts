@@ -1,11 +1,7 @@
 import { useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { 
-  handleAuthError, 
-  shouldRedirectToLogin, 
-  getAuthErrorMessage 
-} from '@/lib/auth-errors'
+import { handleAuthError, shouldRedirectToLogin, getAuthErrorMessage } from '@/lib/auth-errors'
 
 interface UseAuthErrorHandlerOptions {
   onSessionExpired?: () => void
@@ -20,40 +16,43 @@ export function useAuthErrorHandler(options: UseAuthErrorHandlerOptions = {}) {
   const router = useRouter()
   const { onSessionExpired, redirectDelay = 2000 } = options
 
-  const handleError = useCallback((error: unknown) => {
-    const authError = handleAuthError(error)
-    const message = getAuthErrorMessage(error)
-    
-    // Show error toast
-    toast.error(message, {
-      duration: 5000,
-      id: 'auth-error', // Prevent duplicate toasts
-    })
+  const handleError = useCallback(
+    (error: unknown) => {
+      const authError = handleAuthError(error)
+      const message = getAuthErrorMessage(error)
 
-    // Handle session expiry
-    if (authError.code === 'SESSION_EXPIRED') {
-      // Call custom handler if provided
-      onSessionExpired?.()
-
-      // Show redirect notice
-      toast.info('Redirecting to login...', {
-        duration: redirectDelay,
-        id: 'auth-redirect',
+      // Show error toast
+      toast.error(message, {
+        duration: 5000,
+        id: 'auth-error', // Prevent duplicate toasts
       })
 
-      // Redirect after delay
-      setTimeout(() => {
-        router.push('/auth')
-      }, redirectDelay)
-    } else if (shouldRedirectToLogin(error)) {
-      // Handle other auth errors that need redirect
-      setTimeout(() => {
-        router.push('/auth')
-      }, redirectDelay)
-    }
+      // Handle session expiry
+      if (authError.code === 'SESSION_EXPIRED') {
+        // Call custom handler if provided
+        onSessionExpired?.()
 
-    return authError
-  }, [router, onSessionExpired, redirectDelay])
+        // Show redirect notice
+        toast.info('Redirecting to login...', {
+          duration: redirectDelay,
+          id: 'auth-redirect',
+        })
+
+        // Redirect after delay
+        setTimeout(() => {
+          router.push('/auth')
+        }, redirectDelay)
+      } else if (shouldRedirectToLogin(error)) {
+        // Handle other auth errors that need redirect
+        setTimeout(() => {
+          router.push('/auth')
+        }, redirectDelay)
+      }
+
+      return authError
+    },
+    [router, onSessionExpired, redirectDelay]
+  )
 
   return { handleError }
 }

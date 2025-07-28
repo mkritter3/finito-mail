@@ -60,28 +60,16 @@ export function handleAuthError(error: unknown): AuthError {
 
   // Network error
   if (error instanceof TypeError && error.message.includes('fetch')) {
-    return new AuthError(
-      'Network error. Please check your connection.',
-      'NETWORK_ERROR',
-      error
-    )
+    return new AuthError('Network error. Please check your connection.', 'NETWORK_ERROR', error)
   }
 
   // Generic unauthorized
   if (error && typeof error === 'object' && 'status' in error && error.status === 403) {
-    return new AuthError(
-      'You are not authorized to perform this action.',
-      'UNAUTHORIZED',
-      error
-    )
+    return new AuthError('You are not authorized to perform this action.', 'UNAUTHORIZED', error)
   }
 
   // Unknown error
-  return new AuthError(
-    'An unexpected error occurred. Please try again.',
-    'UNKNOWN',
-    error
-  )
+  return new AuthError('An unexpected error occurred. Please try again.', 'UNKNOWN', error)
 }
 
 /**

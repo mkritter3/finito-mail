@@ -23,7 +23,7 @@ export async function getCurrentUser(): Promise<User | null> {
   if (isDevMode()) {
     const cookieStore = await cookies()
     const devAuthEmail = cookieStore.get('dev-auth-user')?.value
-    
+
     if (devAuthEmail) {
       const devUser = getDevUser(devAuthEmail)
       if (devUser) {
@@ -31,7 +31,7 @@ export async function getCurrentUser(): Promise<User | null> {
           id: devUser.id,
           email: devAuthEmail,
           name: devUser.name,
-          role: devUser.role
+          role: devUser.role,
         }
       }
     }
@@ -40,8 +40,11 @@ export async function getCurrentUser(): Promise<User | null> {
 
   // Production mode - use Supabase
   const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+
   if (error || !user) {
     return null
   }
@@ -50,7 +53,7 @@ export async function getCurrentUser(): Promise<User | null> {
     id: user.id,
     email: user.email!,
     name: user.user_metadata?.full_name || user.email?.split('@')[0],
-    role: user.app_metadata?.role || 'user'
+    role: user.app_metadata?.role || 'user',
   }
 }
 
@@ -76,8 +79,11 @@ export async function getCurrentUserClient(): Promise<User | null> {
 
   // Production mode - use Supabase
   const supabase = createClientBrowser()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+
   if (error || !user) {
     return null
   }
@@ -86,7 +92,7 @@ export async function getCurrentUserClient(): Promise<User | null> {
     id: user.id,
     email: user.email!,
     name: user.user_metadata?.full_name || user.email?.split('@')[0],
-    role: user.app_metadata?.role || 'user'
+    role: user.app_metadata?.role || 'user',
   }
 }
 
