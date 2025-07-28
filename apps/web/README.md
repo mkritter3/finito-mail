@@ -1,8 +1,12 @@
 # Finito Mail - Web Application
 
+## 📌 Current Status
+
+**Development Stage**: We are currently in active development, focusing on local environment setup and RLS implementation.
+
 ## 🚀 Local Development Setup
 
-This guide focuses on local development, which is our primary development environment during the current development stage.
+This section covers local development, which is our current focus.
 
 ### Prerequisites
 
@@ -145,15 +149,32 @@ npm run rls:generate-test-data       # Generate test data SQL
 
 ## 🚦 Development Status
 
-Currently focusing on:
+### Currently Working On:
 1. Getting RLS working in local development
 2. Implementing core features with proper data isolation
 3. Building UI incrementally with working data access
 
-Not yet ready for:
-- Staging deployment
-- Production deployment
-- External user testing
+### Future Phases:
+- **Staging**: Will deploy after local development is stable
+- **Production**: Will deploy after staging validation
+- **External Testing**: After core features are complete
+
+## 🗺️ Environment Roadmap
+
+1. **Local Development** (Current) ← We are here
+   - RLS implementation
+   - Core feature development
+   - UI development
+
+2. **Staging Deployment** (Next)
+   - Integration testing
+   - Performance validation
+   - Security audit
+
+3. **Production Deployment** (Future)
+   - Gradual rollout
+   - Monitoring and alerts
+   - User migration
 
 ---
 

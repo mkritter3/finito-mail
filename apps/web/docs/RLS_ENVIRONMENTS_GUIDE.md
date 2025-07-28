@@ -2,11 +2,13 @@
 
 ## Overview
 
-This guide clarifies the different environments for RLS testing. **During development, we focus exclusively on the local environment.**
+This guide clarifies the different environments for RLS testing and when to use each.
+
+**Current Status: We are in development stage, focusing on local development.**
 
 ## Environment Types
 
-### 1. Local Development (Recommended for RLS Development)
+### 1. Local Development (Current Focus)
 - **URL**: `http://localhost:54321`
 - **Config**: `.env.local`
 - **Purpose**: Full control for development and testing
@@ -24,24 +26,28 @@ This guide clarifies the different environments for RLS testing. **During develo
 - **Purpose**: Live application
 - **Never test RLS here!**
 
-## Current Development Approach
+## When to Use Each Environment
 
-**We are focusing on local development only during the current development stage.**
+### Use Local Development For:
+✅ Initial RLS policy development
+✅ Creating test users freely
+✅ Testing RLS policies without restrictions
+✅ Performance baseline testing
+✅ Debugging RLS issues
+✅ Running automated tests
+**👉 Currently using this for all development**
 
-### Why Local Development?
-✅ Full control over schema and data
-✅ No external dependencies or restrictions
-✅ Fast iteration and debugging
-✅ Can fix issues immediately
-✅ Perfect for RLS policy development
-✅ Matches production patterns
+### Use Staging For:
+✅ Final validation before production
+✅ Testing with production-like data
+✅ Integration testing with other services
+✅ Performance testing at scale
+❌ Not ideal for initial development (restrictions)
+**👉 Will use this after local development is complete**
 
-### Staging/Production (Future)
-These environments will be used later for:
-- Final validation before release
-- Integration testing
-- Performance testing at scale
-- User acceptance testing
+### Use Production For:
+✅ Live user data only
+❌ Never for testing or development
 
 ## Local Development Setup
 
@@ -51,27 +57,36 @@ These environments will be used later for:
 npx supabase start
 ```
 
-### 2. Apply RLS Policies
+### 2. Fix Local Schema
+```bash
+# Generate schema fix (first time only)
+npm run fix:local-schema
+
+# Apply in Supabase Studio
+# http://localhost:54323 → SQL Editor
+```
+
+### 3. Apply RLS Policies
 ```bash
 # Generate RLS migration if not exists
 npm run rls:phase2:generate-migration
 
 # Apply to local database
-npm run demo:setup-rls
+npm run rls:apply-local
 ```
 
-### 3. Create Demo Users
+### 4. Create Demo Users
 ```bash
 # Creates 3 demo users with sample data
 npm run demo:create-users
 ```
 
-### 4. Test RLS
+### 5. Test RLS
 ```bash
 # Run automated tests
 npm run rls:phase2:verify
 
-# Or test manually at http://localhost:3000
+# Or test manually at http://localhost:3000/auth/dev
 ```
 
 ## Demo Users (Local Only)
@@ -83,9 +98,9 @@ npm run rls:phase2:verify
 | Charlie | charlie@demo.local | demo123456 | admin | Test admin privileges |
 
 Each demo user comes with:
-- 15 sample emails
+- 15 sample emails (if schema fix applied)
 - 3 email rules
-- Various labels and read states
+- Various read states
 
 ## Quick Commands
 
@@ -94,6 +109,9 @@ Each demo user comes with:
 # Complete local setup
 npm run demo:setup
 
+# Fix schema issues
+npm run fix:local-schema
+
 # Just create users
 npm run demo:create-users
 
@@ -101,10 +119,11 @@ npm run demo:create-users
 npm run demo:setup-rls
 
 # Verify RLS
+npm run rls:verify-enabled
 npm run rls:phase2:verify
 ```
 
-### Staging Testing
+### Staging Testing (Future)
 ```bash
 # Use staging environment
 export NODE_ENV=staging
@@ -125,9 +144,16 @@ You're trying to run local scripts against staging. Check your environment.
 
 ### "Email signups are disabled"
 This happens in staging. Either:
-1. Use local development instead
+1. Use local development instead (recommended during development)
 2. Create users manually in Supabase Dashboard
 3. Ask admin to enable signups temporarily
+
+### "Foreign key constraint violations"
+Need to fix local schema first:
+```bash
+npm run fix:local-schema
+# Then apply SQL in Supabase Studio
+```
 
 ### "RLS policies not working"
 1. Check if RLS is enabled: `SELECT tablename, rowsecurity FROM pg_tables`
@@ -149,17 +175,26 @@ This happens in staging. Either:
 
 ## Migration Path
 
-1. **Local Development**
-   - Develop and test RLS policies
-   - Create comprehensive test suite
-   - Verify performance impact
+### 1. Local Development (Current Stage)
+- Develop and test RLS policies ✅
+- Fix schema issues ✅
+- Create comprehensive test suite ✅
+- Verify basic functionality 🚧
+- Build UI with RLS 🚧
 
-2. **Staging Validation**
-   - Apply same migrations
-   - Test with production-like data
-   - Verify integrations work
+### 2. Staging Validation (Future)
+- Apply same migrations
+- Test with production-like data
+- Verify integrations work
+- Performance testing
+- Security audit
 
-3. **Production Deployment**
-   - Apply migrations during maintenance
-   - Monitor for violations
-   - Have rollback plan ready
+### 3. Production Deployment (Future)
+- Apply migrations during maintenance
+- Monitor for violations
+- Have rollback plan ready
+- Gradual rollout with feature flags
+
+---
+
+**Remember**: We're currently in local development. Staging and production workflows are documented for future use.
