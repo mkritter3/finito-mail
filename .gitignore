@@ -25,12 +25,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Local env files
-.env*.local
-.env
-.env.development
-.env.staging
-.env.production
+# Environment Variables
+# Ignore all env files except the example
+.env*
+!.env.example
 
 # Vercel
 .vercel
@@ -70,3 +68,6 @@ logs
 
 # Reference materials
 reference/
+
+# Files with secrets
+RAILWAY_ENV_VARS_STAGING.md
