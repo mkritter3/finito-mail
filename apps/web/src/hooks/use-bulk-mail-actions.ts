@@ -3,11 +3,7 @@
 import { useTransition } from 'react'
 import { toast } from 'sonner'
 import { useEmailStore } from '@/stores/email-store'
-import { 
-  performBulkEmailAction,
-  type BulkAction,
-  type BulkActionResult 
-} from '@/app/mail/actions'
+import { performBulkEmailAction, type BulkAction } from '@/app/mail/actions'
 
 interface BulkMailActions {
   isPending: boolean
@@ -24,10 +20,10 @@ interface BulkMailActions {
  * Uses server actions with optimistic updates via useOptimistic in components
  */
 export function useBulkMailActions(): BulkMailActions {
-  const [isPending, startTransition] = useTransition()
-  
+  const [isPending] = useTransition()
+
   // Get store update functions (only called on success)
-  const updateEmailStore = useEmailStore((state) => state.updateEmails)
+  const updateEmailStore = useEmailStore(state => state.updateEmail)
 
   /**
    * Generic handler for server actions
@@ -40,12 +36,12 @@ export function useBulkMailActions(): BulkMailActions {
     labelId?: string
   ): Promise<void> {
     const result = await performBulkEmailAction(ids, action, labelId)
-    
+
     if (result.success) {
       // Update the global store with confirmed changes
       const storeUpdates = ids.map(id => {
         const updates: any = { id }
-        
+
         switch (action) {
           case 'mark_read':
             updates.is_read = true
@@ -61,16 +57,19 @@ export function useBulkMailActions(): BulkMailActions {
             break
           // Label updates would be handled differently based on your store structure
         }
-        
+
         return updates
       })
-      
+
       // Update store with confirmed changes
-      updateEmailStore(storeUpdates)
-      
+      storeUpdates.forEach(update => {
+        const { id, ...updateData } = update
+        updateEmailStore(id, updateData)
+      })
+
       // Show success message
       toast.success(successMessage)
-      
+
       // Handle partial failures
       if (result.failed > 0) {
         toast.warning(`${result.failed} of ${ids.length} emails failed to update`)
@@ -80,7 +79,7 @@ export function useBulkMailActions(): BulkMailActions {
       // Just show the error message
       const errorMessage = result.errors?.[0]?.error || 'Operation failed'
       toast.error(errorMessage)
-      
+
       // Throw to ensure useOptimistic reverts
       throw new Error(errorMessage)
     }
@@ -88,27 +87,27 @@ export function useBulkMailActions(): BulkMailActions {
 
   return {
     isPending,
-    
+
     archive: async (ids: string[]) => {
       await handleAction(ids, 'archive', `${ids.length} email(s) archived`)
     },
-    
+
     markAsRead: async (ids: string[]) => {
       await handleAction(ids, 'mark_read', `${ids.length} email(s) marked as read`)
     },
-    
+
     markAsUnread: async (ids: string[]) => {
       await handleAction(ids, 'mark_unread', `${ids.length} email(s) marked as unread`)
     },
-    
+
     deleteEmails: async (ids: string[]) => {
       await handleAction(ids, 'delete', `${ids.length} email(s) deleted`)
     },
-    
+
     addLabel: async (ids: string[], labelId: string) => {
       await handleAction(ids, 'add_label', `Label added to ${ids.length} email(s)`, labelId)
     },
-    
+
     removeLabel: async (ids: string[], labelId: string) => {
       await handleAction(ids, 'remove_label', `Label removed from ${ids.length} email(s)`, labelId)
     },

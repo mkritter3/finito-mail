@@ -1,15 +1,37 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { Loader2, GripVertical, Settings, Plus, Play, Pause, Edit3, Trash2, BarChart3 } from 'lucide-react'
+import {
+  Loader2,
+  GripVertical,
+  Settings,
+  Plus,
+  Play,
+  Pause,
+  Edit3,
+  Trash2,
+  BarChart3,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface EmailRule {
@@ -49,21 +71,22 @@ interface RulesStats {
   }>
 }
 
-function SortableRuleCard({ rule, onToggle, onEdit, onDelete, isUpdating }: {
+function SortableRuleCard({
+  rule,
+  onToggle,
+  onEdit,
+  onDelete,
+  isUpdating,
+}: {
   rule: EmailRule
   onToggle: (id: string, enabled: boolean) => void
   onEdit: (rule: EmailRule) => void
   onDelete: (id: string) => void
   isUpdating?: boolean
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: rule.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: rule.id,
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -71,37 +94,39 @@ function SortableRuleCard({ rule, onToggle, onEdit, onDelete, isUpdating }: {
   }
 
   const getActionDescription = (actions: Array<{ type: string; value?: string }>) => {
-    return actions.map(action => {
-      switch (action.type) {
-        case 'add_label':
-          return `Label: ${action.value}`
-        case 'archive':
-          return 'Archive'
-        case 'mark_read':
-          return 'Mark read'
-        case 'mark_unread':
-          return 'Mark unread'
-        case 'delete':
-          return 'Delete'
-        case 'forward':
-          return `Forward to ${action.value}`
-        case 'reply':
-          return 'Auto-reply'
-        case 'stop_processing':
-          return 'Stop processing'
-        default:
-          return action.type
-      }
-    }).join(', ')
+    return actions
+      .map(action => {
+        switch (action.type) {
+          case 'add_label':
+            return `Label: ${action.value}`
+          case 'archive':
+            return 'Archive'
+          case 'mark_read':
+            return 'Mark read'
+          case 'mark_unread':
+            return 'Mark unread'
+          case 'delete':
+            return 'Delete'
+          case 'forward':
+            return `Forward to ${action.value}`
+          case 'reply':
+            return 'Auto-reply'
+          case 'stop_processing':
+            return 'Stop processing'
+          default:
+            return action.type
+        }
+      })
+      .join(', ')
   }
 
   const getConditionDescription = (conditions: EmailRule['conditions']) => {
     if (!conditions?.rules?.length) return 'No conditions'
-    
+
     const descriptions = conditions.rules.map(rule => {
       const fieldName = rule.field.replace('_', ' ')
       let operatorText = rule.operator
-      
+
       switch (rule.operator) {
         case 'contains':
           operatorText = 'contains'
@@ -121,10 +146,10 @@ function SortableRuleCard({ rule, onToggle, onEdit, onDelete, isUpdating }: {
         default:
           operatorText = rule.operator
       }
-      
+
       return `${fieldName} ${operatorText} "${rule.value}"`
     })
-    
+
     return descriptions.join(` ${conditions.operator} `)
   }
 
@@ -132,15 +157,11 @@ function SortableRuleCard({ rule, onToggle, onEdit, onDelete, isUpdating }: {
     <div
       ref={setNodeRef}
       style={style}
-      className={cn(
-        'transition-all duration-200',
-        isDragging && 'opacity-50 scale-95'
-      )}
+      className={cn('transition-all duration-200', isDragging && 'opacity-50 scale-95')}
     >
-      <Card className={cn(
-        'group hover:shadow-md transition-shadow',
-        !rule.enabled && 'opacity-60'
-      )}>
+      <Card
+        className={cn('group hover:shadow-md transition-shadow', !rule.enabled && 'opacity-60')}
+      >
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -151,7 +172,7 @@ function SortableRuleCard({ rule, onToggle, onEdit, onDelete, isUpdating }: {
               >
                 <GripVertical className="h-4 w-4 text-gray-400" />
               </button>
-              
+
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs">
                   #{rule.priority}
@@ -159,18 +180,16 @@ function SortableRuleCard({ rule, onToggle, onEdit, onDelete, isUpdating }: {
                 <div>
                   <CardTitle className="text-sm">{rule.name}</CardTitle>
                   {rule.description && (
-                    <CardDescription className="text-xs mt-1">
-                      {rule.description}
-                    </CardDescription>
+                    <CardDescription className="text-xs mt-1">{rule.description}</CardDescription>
                   )}
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Switch
                 checked={rule.enabled}
-                onCheckedChange={(checked) => onToggle(rule.id, checked)}
+                onCheckedChange={checked => onToggle(rule.id, checked)}
                 disabled={isUpdating}
               />
               <Button
@@ -192,7 +211,7 @@ function SortableRuleCard({ rule, onToggle, onEdit, onDelete, isUpdating }: {
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent>
           <div className="space-y-3">
             <div>
@@ -201,7 +220,7 @@ function SortableRuleCard({ rule, onToggle, onEdit, onDelete, isUpdating }: {
                 {getConditionDescription(rule.conditions)}
               </div>
             </div>
-            
+
             <div>
               <h4 className="text-xs font-medium text-gray-600 mb-1">ACTIONS</h4>
               <div className="text-sm bg-blue-50 p-2 rounded">
@@ -267,7 +286,7 @@ export default function RulesPage() {
       const newIndex = rules.findIndex(rule => rule.id === over.id)
 
       const newRules = arrayMove(rules, oldIndex, newIndex)
-      
+
       // Update local state immediately for smooth UX
       setRules(newRules)
 
@@ -275,16 +294,16 @@ export default function RulesPage() {
       try {
         const bulkUpdates = newRules.map((rule, index) => ({
           id: rule.id,
-          priority: index + 1
+          priority: index + 1,
         }))
 
         await fetch('/api/rules/bulk', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             operation: 'update_priorities',
-            rules: bulkUpdates
-          })
+            rules: bulkUpdates,
+          }),
         })
       } catch (error) {
         console.error('Error updating priorities:', error)
@@ -296,18 +315,16 @@ export default function RulesPage() {
 
   const handleToggleRule = async (id: string, enabled: boolean) => {
     setUpdating(prev => new Set(prev).add(id))
-    
+
     try {
       const response = await fetch(`/api/rules/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled })
+        body: JSON.stringify({ enabled }),
       })
-      
+
       if (response.ok) {
-        setRules(prev => prev.map(rule => 
-          rule.id === id ? { ...rule, enabled } : rule
-        ))
+        setRules(prev => prev.map(rule => (rule.id === id ? { ...rule, enabled } : rule)))
       }
     } catch (error) {
       console.error('Error toggling rule:', error)
@@ -330,9 +347,9 @@ export default function RulesPage() {
 
     try {
       const response = await fetch(`/api/rules/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       })
-      
+
       if (response.ok) {
         setRules(prev => prev.filter(rule => rule.id !== id))
       }
@@ -357,7 +374,7 @@ export default function RulesPage() {
             <Settings className="h-6 w-6 text-blue-600" />
             <h1 className="text-3xl font-bold">Rules Management</h1>
           </div>
-          
+
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -369,14 +386,14 @@ export default function RulesPage() {
               <BarChart3 className="h-4 w-4 mr-2" />
               {showStats ? 'Hide' : 'Show'} Statistics
             </Button>
-            
+
             <Button>
               <Plus className="h-4 w-4 mr-2" />
               Create Rule
             </Button>
           </div>
         </div>
-        
+
         <p className="text-gray-600">
           Manage your email automation rules. Drag and drop to reorder priority.
         </p>
@@ -390,12 +407,10 @@ export default function RulesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.total_rules}</div>
-              <div className="text-sm text-gray-600">
-                {stats.active_rules} active
-              </div>
+              <div className="text-sm text-gray-600">{stats.active_rules} active</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Executions</CardTitle>
@@ -407,7 +422,7 @@ export default function RulesPage() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Performance</CardTitle>
@@ -417,7 +432,7 @@ export default function RulesPage() {
               <div className="text-sm text-gray-600">Average execution time</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Most Active</CardTitle>
@@ -425,7 +440,9 @@ export default function RulesPage() {
             <CardContent>
               {stats.most_triggered_rules.length > 0 ? (
                 <div>
-                  <div className="text-sm font-medium">{stats.most_triggered_rules[0].rule_name}</div>
+                  <div className="text-sm font-medium">
+                    {stats.most_triggered_rules[0].rule_name}
+                  </div>
                   <div className="text-sm text-gray-600">
                     {stats.most_triggered_rules[0].execution_count} executions
                   </div>
@@ -475,9 +492,12 @@ export default function RulesPage() {
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext items={rules.map(rule => rule.id)} strategy={verticalListSortingStrategy}>
+            <SortableContext
+              items={rules.map(rule => rule.id)}
+              strategy={verticalListSortingStrategy}
+            >
               <div className="space-y-4">
-                {rules.map((rule) => (
+                {rules.map(rule => (
                   <SortableRuleCard
                     key={rule.id}
                     rule={rule}

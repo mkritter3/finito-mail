@@ -16,19 +16,21 @@ interface MailShellProps {
   userEmail?: string
 }
 
-export function MailShell({ children, userEmail }: MailShellProps) {
+export function MailShell({ children, userEmail: _userEmail }: MailShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [todoPanelOpen, setTodoPanelOpen] = useState(false)
   const [searchPanelOpen, setSearchPanelOpen] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState(false)
   const [composeOpen, setComposeOpen] = useState(false)
-  const [composeMode, setComposeMode] = useState<'compose' | 'reply' | 'replyAll' | 'forward'>('compose')
+  const [composeMode, setComposeMode] = useState<'compose' | 'reply' | 'replyAll' | 'forward'>(
+    'compose'
+  )
   const [replyToEmail, setReplyToEmail] = useState<any>(null)
 
   // Initialize database
   const [dbInitialized, setDbInitialized] = useState(false)
-  
+
   useEffect(() => {
     if (!dbInitialized) {
       initializeDatabase()
@@ -88,9 +90,7 @@ export function MailShell({ children, userEmail }: MailShellProps) {
         <Header />
 
         {/* Email content */}
-        <main className="flex-1 overflow-hidden">
-          {children}
-        </main>
+        <main className="flex-1 overflow-hidden">{children}</main>
       </div>
 
       {/* Todo Panel */}
@@ -103,9 +103,9 @@ export function MailShell({ children, userEmail }: MailShellProps) {
       <CommandPalette isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
 
       {/* Keyboard Shortcuts Dialog */}
-      <KeyboardShortcutsDialog 
-        isOpen={shortcutsDialogOpen} 
-        onClose={() => setShortcutsDialogOpen(false)} 
+      <KeyboardShortcutsDialog
+        isOpen={shortcutsDialogOpen}
+        onClose={() => setShortcutsDialogOpen(false)}
       />
 
       {/* Compose Dialog */}

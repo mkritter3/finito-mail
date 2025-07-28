@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server'
 import { MailView } from './mail-view'
 import type { EmailFolder } from '@finito/types'
 
@@ -8,17 +7,18 @@ interface PageProps {
   }
 }
 
-async function fetchEmails(folder: string) {
-  const supabase = await createClient()
-  
+async function fetchEmails(_folder: string) {
+  // const supabase = await createClient()
+
   // For now, return empty array - actual implementation would fetch from database
   // This will be implemented when we have the email syncing logic
+  // TODO: Filter by folder when implementing
   return []
 }
 
 export default async function MailPage({ params }: PageProps) {
   const folder = (params.folder as EmailFolder) || 'inbox'
-  
+
   // Fetch emails server-side
   const emails = await fetchEmails(folder)
 

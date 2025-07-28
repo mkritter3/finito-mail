@@ -9,7 +9,7 @@ type QueryResult<T> = {
  * Wrapper function for making authenticated API calls.
  * This function now simply passes through the query result as all auth
  * is handled by Supabase SSR cookies.
- * 
+ *
  * @param query - The Supabase query to execute
  * @returns The query result or an error
  */
@@ -28,8 +28,8 @@ export async function authenticatedApiCall<T>(
         message: err instanceof Error ? err.message : 'An unexpected error occurred',
         code: 'unexpected_error',
         details: String(err),
-        hint: 'Please try again or contact support'
-      } as PostgrestError
+        hint: 'Please try again or contact support',
+      } as PostgrestError,
     }
   }
 }

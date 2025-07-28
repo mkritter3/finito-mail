@@ -12,7 +12,7 @@ interface EmailListProps {
   folder: EmailFolder
 }
 
-export function EmailList({ emails, folder }: EmailListProps) {
+export function EmailList({ emails, folder: _folder }: EmailListProps) {
   const parentRef = useRef<HTMLDivElement>(null)
 
   // All hooks must be called before any conditional returns
@@ -38,7 +38,7 @@ export function EmailList({ emails, folder }: EmailListProps) {
             height: `${virtualizer.getTotalSize()}px`,
           }}
         >
-          {virtualizer.getVirtualItems().map((virtualItem) => {
+          {virtualizer.getVirtualItems().map(virtualItem => {
             const email = emails[virtualItem.index]
             return (
               <div

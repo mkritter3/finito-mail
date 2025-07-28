@@ -3,7 +3,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export type BulkAction = 'mark_read' | 'mark_unread' | 'archive' | 'delete' | 'add_label' | 'remove_label'
+export type BulkAction =
+  | 'mark_read'
+  | 'mark_unread'
+  | 'archive'
+  | 'delete'
+  | 'add_label'
+  | 'remove_label'
 
 export interface BulkActionResult {
   success: boolean
@@ -35,19 +41,23 @@ export async function performBulkEmailAction(
   const supabase = await createClient()
 
   // Check authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
   if (authError || !user) {
     return {
       success: false,
       processed: 0,
       successful: 0,
       failed: emailIds.length,
+      results: [],
       errors: emailIds.map(id => ({
         emailId: id,
         success: false,
-        error: 'Authentication required'
-      }))
+        error: 'Authentication required',
+      })),
     }
   }
 
@@ -58,7 +68,8 @@ export async function performBulkEmailAction(
       processed: 0,
       successful: 0,
       failed: 0,
-      errors: [{ emailId: '', success: false, error: 'No emails selected' }]
+      results: [],
+      errors: [{ emailId: '', success: false, error: 'No emails selected' }],
     }
   }
 
@@ -68,7 +79,8 @@ export async function performBulkEmailAction(
       processed: 0,
       successful: 0,
       failed: emailIds.length,
-      errors: [{ emailId: '', success: false, error: 'Too many emails selected (max 100)' }]
+      results: [],
+      errors: [{ emailId: '', success: false, error: 'Too many emails selected (max 100)' }],
     }
   }
 
@@ -78,7 +90,8 @@ export async function performBulkEmailAction(
       processed: 0,
       successful: 0,
       failed: emailIds.length,
-      errors: [{ emailId: '', success: false, error: 'Label ID required for label actions' }]
+      results: [],
+      errors: [{ emailId: '', success: false, error: 'Label ID required for label actions' }],
     }
   }
 
@@ -96,7 +109,7 @@ export async function performBulkEmailAction(
   const results = emailIds.map(emailId => ({
     emailId,
     success: true,
-    result: { action, timestamp: new Date().toISOString() }
+    result: { action, timestamp: new Date().toISOString() },
   }))
 
   // Revalidate the mail page to reflect changes
@@ -107,36 +120,6 @@ export async function performBulkEmailAction(
     processed: emailIds.length,
     successful: emailIds.length,
     failed: 0,
-    results
+    results,
   }
-}
-
-/**
- * Get display name for a bulk action
- */
-export function getActionDisplayName(action: BulkAction): string {
-  const displayNames: Record<BulkAction, string> = {
-    'mark_read': 'Mark as Read',
-    'mark_unread': 'Mark as Unread',
-    'archive': 'Archive',
-    'delete': 'Delete',
-    'add_label': 'Add Label',
-    'remove_label': 'Remove Label'
-  }
-  return displayNames[action] || action
-}
-
-/**
- * Get icon for a bulk action
- */
-export function getActionIcon(action: BulkAction): string {
-  const icons: Record<BulkAction, string> = {
-    'mark_read': '📖',
-    'mark_unread': '📧',
-    'archive': '📁',
-    'delete': '🗑️',
-    'add_label': '🏷️',
-    'remove_label': '🏷️'
-  }
-  return icons[action] || '⚡'
 }

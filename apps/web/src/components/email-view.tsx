@@ -12,30 +12,36 @@ export function EmailView({ emailId }: EmailViewProps) {
   const { email, loading, error } = useFullEmail(emailId)
 
   const handleReply = () => {
-    window.dispatchEvent(new CustomEvent('compose-email', { 
-      detail: { 
-        mode: 'reply',
-        replyTo: email
-      }
-    }))
+    window.dispatchEvent(
+      new CustomEvent('compose-email', {
+        detail: {
+          mode: 'reply',
+          replyTo: email,
+        },
+      })
+    )
   }
 
   const handleReplyAll = () => {
-    window.dispatchEvent(new CustomEvent('compose-email', { 
-      detail: { 
-        mode: 'replyAll',
-        replyTo: email
-      }
-    }))
+    window.dispatchEvent(
+      new CustomEvent('compose-email', {
+        detail: {
+          mode: 'replyAll',
+          replyTo: email,
+        },
+      })
+    )
   }
 
   const handleForward = () => {
-    window.dispatchEvent(new CustomEvent('compose-email', { 
-      detail: { 
-        mode: 'forward',
-        replyTo: email
-      }
-    }))
+    window.dispatchEvent(
+      new CustomEvent('compose-email', {
+        detail: {
+          mode: 'forward',
+          replyTo: email,
+        },
+      })
+    )
   }
 
   if (loading) {
@@ -48,9 +54,7 @@ export function EmailView({ emailId }: EmailViewProps) {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-red-500">
-        Error: {error}
-      </div>
+      <div className="flex items-center justify-center h-full text-red-500">Error: {error}</div>
     )
   }
 
@@ -73,22 +77,18 @@ export function EmailView({ emailId }: EmailViewProps) {
               {email.from[0].toUpperCase()}
             </div>
             <div>
-              <div className="font-medium text-foreground">
-                {email.from}
-              </div>
+              <div className="font-medium text-foreground">{email.from}</div>
               <div className="text-xs">to: {email.to}</div>
             </div>
           </div>
-          <div className="ml-auto">
-            {formatDistanceToNow(new Date(email.date))}
-          </div>
+          <div className="ml-auto">{formatDistanceToNow(new Date(email.date))}</div>
         </div>
       </div>
 
       {/* Email body */}
       <div className="flex-1 overflow-auto px-6 py-4">
         {email.htmlBody ? (
-          <div 
+          <div
             className="prose prose-sm dark:prose-invert max-w-none"
             dangerouslySetInnerHTML={{ __html: email.htmlBody }}
           />
@@ -99,28 +99,28 @@ export function EmailView({ emailId }: EmailViewProps) {
 
       {/* Actions */}
       <div className="px-6 py-4 border-t border-border flex items-center gap-2">
-        <button 
+        <button
           onClick={handleReply}
           className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm"
         >
           <Reply className="w-4 h-4" />
           Reply
         </button>
-        <button 
+        <button
           onClick={handleReplyAll}
           className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-md hover:bg-muted text-sm"
         >
           <ReplyAll className="w-4 h-4" />
           Reply All
         </button>
-        <button 
+        <button
           onClick={handleForward}
           className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-md hover:bg-muted text-sm"
         >
           <Forward className="w-4 h-4" />
           Forward
         </button>
-        
+
         <div className="ml-auto flex items-center gap-2">
           <button className="p-1.5 hover:bg-muted rounded-md transition-colors">
             <Archive className="w-4 h-4" />

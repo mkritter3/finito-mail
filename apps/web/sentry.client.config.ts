@@ -5,19 +5,19 @@ const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN
 
 Sentry.init({
   dsn: SENTRY_DSN,
-  
+
   // Environment
   environment: process.env.NEXT_PUBLIC_ENV || 'development',
-  
+
   // Performance Monitoring
   tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-  
+
   // Session Replay
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
-  
+
   // Session tracking is enabled by default in newer versions
-  
+
   // Integrations
   integrations: [
     Sentry.replayIntegration({
@@ -27,15 +27,15 @@ Sentry.init({
       blockAllMedia: true,
       // Selectively unmask elements known to be safe
       unmask: [
-        '.sentry-unmask',        // Generic unmask class
-        '.safe-for-replay',      // Alternative naming
-        '[data-sentry-unmask]',  // Data attribute approach
+        '.sentry-unmask', // Generic unmask class
+        '.safe-for-replay', // Alternative naming
+        '[data-sentry-unmask]', // Data attribute approach
       ],
       // Extra blocking for highly sensitive areas
       block: [
-        '.sentry-block',         // Generic block class
-        '.sensitive-data',       // Semantic class name
-        '[data-sentry-block]',   // Data attribute approach
+        '.sentry-block', // Generic block class
+        '.sensitive-data', // Semantic class name
+        '[data-sentry-block]', // Data attribute approach
         // Common sensitive selectors
         'input[type="password"]',
         'input[type="email"]',
@@ -46,13 +46,13 @@ Sentry.init({
       ],
       // Ignore specific form inputs entirely
       ignore: [
-        'input[autocomplete*="cc-"]',  // Credit card fields
+        'input[autocomplete*="cc-"]', // Credit card fields
         '[data-sentry-ignore]',
       ],
     }),
     Sentry.browserTracingIntegration(),
   ],
-  
+
   // Filtering
   ignoreErrors: [
     // Browser extensions
@@ -69,27 +69,35 @@ Sentry.init({
     // Console errors we can't control
     'Non-Error promise rejection captured',
   ],
-  
+
   beforeSend(event, hint) {
     // Filter out certain errors
     if (event.exception) {
       const error = hint.originalException
-      
+
       // Don't log errors from browser extensions
-      if (error && typeof error === 'object' && 'stack' in error && 
-          typeof error.stack === 'string' && 
-          error.stack.match(/chrome-extension:|moz-extension:/)) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'stack' in error &&
+        typeof error.stack === 'string' &&
+        error.stack.match(/chrome-extension:|moz-extension:/)
+      ) {
         return null
       }
-      
+
       // Don't log ResizeObserver errors (common and not actionable)
-      if (error && typeof error === 'object' && 'message' in error && 
-          typeof error.message === 'string' && 
-          error.message.includes('ResizeObserver')) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'message' in error &&
+        typeof error.message === 'string' &&
+        error.message.includes('ResizeObserver')
+      ) {
         return null
       }
     }
-    
+
     return event
   },
 })

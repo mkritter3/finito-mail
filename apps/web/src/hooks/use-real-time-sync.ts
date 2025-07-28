@@ -17,43 +17,43 @@ interface UseRealTimeSyncOptions {
 export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
   const {
     fallbackDelay = 10000, // 10 seconds
-    pollInterval = 5 * 60 * 1000, // 5 minutes
+    pollInterval: _pollInterval = 5 * 60 * 1000, // 5 minutes
     ...sseOptions
   } = options
-  
+
   const [useFallback, setUseFallback] = useState(false)
   const lastSSEActivityRef = useRef<number>(Date.now())
-  
+
   // SSE connection
   const { isConnected, reconnect, disconnect } = useEmailUpdates({
     ...sseOptions,
-    onNewEmail: (email) => {
+    onNewEmail: email => {
       lastSSEActivityRef.current = Date.now()
       sseOptions.onNewEmail?.(email)
     },
-    onEmailUpdate: (email) => {
+    onEmailUpdate: email => {
       lastSSEActivityRef.current = Date.now()
       sseOptions.onEmailUpdate?.(email)
     },
-    onEmailDelete: (emailId) => {
+    onEmailDelete: emailId => {
       lastSSEActivityRef.current = Date.now()
       sseOptions.onEmailDelete?.(emailId)
     },
     onSyncComplete: () => {
       lastSSEActivityRef.current = Date.now()
       sseOptions.onSyncComplete?.()
-    }
+    },
   })
-  
+
   // Monitor SSE connection and activate fallback if needed
   useEffect(() => {
     const checkSSEHealth = () => {
       const timeSinceLastActivity = Date.now() - lastSSEActivityRef.current
-      
+
       if (!isConnected || timeSinceLastActivity > fallbackDelay) {
         logger.warn('SSE appears unhealthy, activating fallback polling', {
           isConnected,
-          timeSinceLastActivity
+          timeSinceLastActivity,
         })
         setUseFallback(true)
       } else {
@@ -64,20 +64,20 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
         }
       }
     }
-    
+
     // Check SSE health periodically
     const interval = setInterval(checkSSEHealth, 5000) // Check every 5 seconds
-    
+
     return () => clearInterval(interval)
   }, [isConnected, fallbackDelay, useFallback])
-  
+
   // Reset activity timer when connected
   useEffect(() => {
     if (isConnected) {
       lastSSEActivityRef.current = Date.now()
     }
   }, [isConnected])
-  
+
   return {
     isConnected,
     isFallbackActive: useFallback,
@@ -85,6 +85,6 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
       setUseFallback(false)
       reconnect()
     },
-    disconnect
+    disconnect,
   }
 }

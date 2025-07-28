@@ -26,10 +26,10 @@ function AuthPageContent() {
           // Verify token with API
           const response = await fetch('/api/auth/me', {
             headers: {
-              'Authorization': `Bearer ${token}`
-            }
+              Authorization: `Bearer ${token}`,
+            },
           })
-          
+
           if (response.ok) {
             router.push('/mail')
             return
@@ -59,7 +59,7 @@ function AuthPageContent() {
       // Get authorization URL from API
       const response = await fetch('/api/auth/google')
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to initialize authentication')
       }
@@ -100,7 +100,7 @@ function AuthPageContent() {
               <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
             </div>
           )}
-          
+
           <div className="space-y-4">
             <Button
               onClick={handleGoogleAuth}
@@ -113,7 +113,8 @@ function AuthPageContent() {
 
             {!clientId && (
               <p className="text-sm text-center text-red-600">
-                Google Client ID not configured. Please set NEXT_PUBLIC_GOOGLE_CLIENT_ID environment variable.
+                Google Client ID not configured. Please set NEXT_PUBLIC_GOOGLE_CLIENT_ID environment
+                variable.
               </p>
             )}
           </div>
@@ -131,11 +132,13 @@ function AuthPageContent() {
 
 export default function AuthPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      }
+    >
       <AuthPageContent />
     </Suspense>
   )

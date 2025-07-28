@@ -23,12 +23,12 @@ export default function SuccessContent() {
         }
 
         // Calculate expiration time
-        const expirationTime = Date.now() + (parseInt(expiresIn) * 1000)
+        const expirationTime = Date.now() + parseInt(expiresIn) * 1000
 
         // Store tokens in localStorage
         localStorage.setItem('gmail_access_token', accessToken)
         localStorage.setItem('gmail_token_expires', expirationTime.toString())
-        
+
         if (refreshToken) {
           localStorage.setItem('gmail_refresh_token', refreshToken)
         }

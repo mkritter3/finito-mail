@@ -25,8 +25,5 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
  */
 function base64URLEncode(buffer: Buffer | Uint8Array): string {
   const base64 = Buffer.from(buffer).toString('base64')
-  return base64
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '')
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }

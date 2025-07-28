@@ -70,21 +70,18 @@ export async function GET() {
   const headersList = headers()
   const providedKey = headersList.get('x-health-api-key')
   const expectedKey = process.env.HEALTH_CHECK_API_KEY
-  
+
   // In production, require API key for detailed health info
   let isAuthorized = process.env.NODE_ENV !== 'production'
-  
+
   // Secure API key comparison for production
   if (process.env.NODE_ENV === 'production') {
     // Fail securely if environment key is not configured
     if (!expectedKey || expectedKey.length === 0) {
       console.error('HEALTH_CHECK_API_KEY is not configured')
-      return NextResponse.json(
-        { error: 'Service misconfigured' },
-        { status: 503 }
-      )
+      return NextResponse.json({ error: 'Service misconfigured' }, { status: 503 })
     }
-    
+
     // Check if user provided a key
     if (!providedKey) {
       isAuthorized = false
@@ -92,7 +89,7 @@ export async function GET() {
       // Convert to buffers for timing-safe comparison
       const providedKeyBuffer = Buffer.from(providedKey)
       const expectedKeyBuffer = Buffer.from(expectedKey)
-      
+
       // Check length first (this is acceptable to leak)
       if (providedKeyBuffer.length !== expectedKeyBuffer.length) {
         isAuthorized = false
@@ -109,7 +106,7 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     uptime: Math.floor((Date.now() - startTime) / 1000),
     environment: process.env.NEXT_PUBLIC_ENV || 'development',
-    checks: {}
+    checks: {},
   }
 
   // Only run detailed checks if authorized
@@ -120,25 +117,25 @@ export async function GET() {
       try {
         const dbStart = Date.now()
         await pool.query('SELECT 1')
-        
+
         health.checks.database = {
           status: 'ok',
-          latency: Date.now() - dbStart
+          latency: Date.now() - dbStart,
         }
       } catch (error) {
         health.status = 'unhealthy'
         health.checks.database = {
           status: 'error',
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         }
         Sentry.captureException(error, {
-          tags: { component: 'health-check', check: 'database' }
+          tags: { component: 'health-check', check: 'database' },
         })
       }
     } else {
       health.checks.database = {
         status: 'error',
-        error: 'Database not configured'
+        error: 'Database not configured',
       }
     }
 
@@ -148,25 +145,25 @@ export async function GET() {
       try {
         const redisStart = Date.now()
         await redis.ping()
-        
+
         health.checks.redis = {
           status: 'ok',
-          latency: Date.now() - redisStart
+          latency: Date.now() - redisStart,
         }
       } catch (error) {
         health.status = health.status === 'unhealthy' ? 'unhealthy' : 'degraded'
         health.checks.redis = {
           status: 'error',
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         }
         Sentry.captureException(error, {
-          tags: { component: 'health-check', check: 'redis' }
+          tags: { component: 'health-check', check: 'redis' },
         })
       }
     } else {
       health.checks.redis = {
         status: 'error',
-        error: 'Redis not configured'
+        error: 'Redis not configured',
       }
     }
 
@@ -175,18 +172,18 @@ export async function GET() {
       const gmailStart = Date.now()
       const response = await fetch('https://www.googleapis.com/oauth2/v1/tokeninfo', {
         method: 'GET',
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(5000),
       })
-      
+
       health.checks.gmail_api = {
         status: response.ok ? 'ok' : 'error',
-        latency: Date.now() - gmailStart
+        latency: Date.now() - gmailStart,
       }
     } catch (error) {
       health.status = health.status === 'unhealthy' ? 'unhealthy' : 'degraded'
       health.checks.gmail_api = {
         status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       }
     }
 
@@ -197,17 +194,17 @@ export async function GET() {
     const memoryPercentage = (usedMemory / totalMemory) * 100
 
     health.checks.memory = {
-      status: memoryPercentage > 90 ? 'error' : 'ok'
+      status: memoryPercentage > 90 ? 'error' : 'ok',
     }
 
     health.metrics = {
       memory: {
         used: Math.round(usedMemory / 1024 / 1024),
         total: Math.round(totalMemory / 1024 / 1024),
-        percentage: Math.round(memoryPercentage)
-      }
+        percentage: Math.round(memoryPercentage),
+      },
     }
-    
+
     // Send custom metrics to Sentry for alerting
     Sentry.setMeasurement('memory.percentage', Math.round(memoryPercentage), 'percent')
     Sentry.setMeasurement('memory.used_mb', Math.round(usedMemory / 1024 / 1024), 'megabyte')
@@ -217,7 +214,7 @@ export async function GET() {
       health.status = 'degraded'
       Sentry.captureMessage('High memory usage detected', {
         level: 'warning',
-        extra: health.metrics.memory
+        extra: health.metrics.memory,
       })
     }
   }
@@ -226,20 +223,22 @@ export async function GET() {
   if (health.status !== 'healthy') {
     Sentry.captureMessage(`Health check ${health.status}`, {
       level: health.status === 'unhealthy' ? 'error' : 'warning',
-      extra: health as Record<string, any>
+      extra: health as Record<string, any>,
     })
   }
 
   // Return appropriate status code
-  const statusCode = health.status === 'healthy' ? 200 : 
-                    health.status === 'degraded' ? 200 : 503
+  const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503
 
   // Basic response for unauthorized requests
   if (!isAuthorized) {
-    return NextResponse.json({
-      status: health.status,
-      timestamp: health.timestamp
-    }, { status: statusCode })
+    return NextResponse.json(
+      {
+        status: health.status,
+        timestamp: health.timestamp,
+      },
+      { status: statusCode }
+    )
   }
 
   return NextResponse.json(health, { status: statusCode })

@@ -1,6 +1,12 @@
 import { useEmailStore } from '@/stores/email-store'
 
-export type BulkAction = 'mark_read' | 'mark_unread' | 'archive' | 'delete' | 'add_label' | 'remove_label'
+export type BulkAction =
+  | 'mark_read'
+  | 'mark_unread'
+  | 'archive'
+  | 'delete'
+  | 'add_label'
+  | 'remove_label'
 
 export interface BulkActionRequest {
   emailIds: string[]
@@ -46,7 +52,7 @@ export class BulkActionsService {
    */
   async executeBulkAction(request: BulkActionRequest): Promise<BulkActionResponse> {
     const { emailIds, action, labelId } = request
-    
+
     // Get auth token
     const token = localStorage.getItem('finito_auth_token')
     if (!token) {
@@ -61,13 +67,13 @@ export class BulkActionsService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           emailIds,
           action,
-          labelId
-        })
+          labelId,
+        }),
       })
 
       if (!response.ok) {
@@ -76,7 +82,7 @@ export class BulkActionsService {
       }
 
       const result: BulkActionResponse = await response.json()
-      
+
       // Handle partial failures - revert optimistic updates for failed emails
       if (result.errors && result.errors.length > 0) {
         this.revertOptimisticUpdates(result.errors.map(e => e.emailId))
@@ -95,10 +101,10 @@ export class BulkActionsService {
    */
   private applyOptimisticUpdates(emailIds: string[], action: BulkAction, labelId?: string) {
     const store = useEmailStore.getState()
-    
+
     for (const emailId of emailIds) {
-      let updates: any = {}
-      
+      const updates: any = {}
+
       switch (action) {
         case 'mark_read':
           updates.is_read = true
@@ -119,7 +125,7 @@ export class BulkActionsService {
           updates.labels = { remove: [labelId] }
           break
       }
-      
+
       store.applyOptimisticUpdate(emailId, updates)
     }
   }
@@ -129,7 +135,7 @@ export class BulkActionsService {
    */
   private revertOptimisticUpdates(emailIds: string[]) {
     const store = useEmailStore.getState()
-    
+
     for (const emailId of emailIds) {
       store.removeOptimisticUpdate(emailId)
     }
@@ -184,26 +190,26 @@ export class BulkActionsService {
    */
   validateRequest(request: BulkActionRequest): { valid: boolean; errors: string[] } {
     const errors: string[] = []
-    
+
     if (!request.emailIds || request.emailIds.length === 0) {
       errors.push('No emails selected')
     }
-    
+
     if (request.emailIds && request.emailIds.length > 100) {
       errors.push('Too many emails selected (max 100)')
     }
-    
+
     if (!request.action) {
       errors.push('No action specified')
     }
-    
+
     if ((request.action === 'add_label' || request.action === 'remove_label') && !request.labelId) {
       errors.push('Label ID required for label actions')
     }
-    
+
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     }
   }
 }

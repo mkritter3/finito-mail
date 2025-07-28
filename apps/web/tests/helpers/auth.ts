@@ -26,8 +26,8 @@ interface AuthTokens {
  * @param user Optional mock user data to pass to the auth endpoint.
  */
 export async function login(
-  page: Page, 
-  user?: { 
+  page: Page,
+  user?: {
     email?: string
     name?: string
     id?: string
@@ -37,9 +37,9 @@ export async function login(
 ) {
   // First navigate to the base URL to establish a context where localStorage works
   await page.goto('/')
-  
+
   const context = await apiRequest.newContext()
-  
+
   try {
     const response = await context.post('http://localhost:3001/api/auth/mock', {
       data: user || {},
@@ -53,12 +53,12 @@ export async function login(
     const tokens = (await response.json()) as AuthTokens
 
     // Set the tokens in the browser's localStorage
-    await page.evaluate((tokens) => {
+    await page.evaluate(tokens => {
       localStorage.setItem('finito_auth_token', tokens.finito_auth_token)
       localStorage.setItem('gmail_access_token', tokens.gmail_access_token)
       localStorage.setItem('gmail_refresh_token', tokens.gmail_refresh_token)
       localStorage.setItem('gmail_token_expires', String(tokens.gmail_token_expires))
-      
+
       // For Supabase auth, we need to set the session in localStorage
       // Supabase stores the session under a specific key pattern
       const supabaseKey = `sb-${window.location.hostname}-auth-token`
@@ -70,14 +70,17 @@ export async function login(
         refresh_token: tokens.gmail_refresh_token,
         user: tokens.user,
         provider_token: tokens.gmail_access_token,
-        provider_refresh_token: tokens.gmail_refresh_token
+        provider_refresh_token: tokens.gmail_refresh_token,
       }
-      
+
       // Store the session in the format Supabase expects
-      localStorage.setItem(supabaseKey, JSON.stringify({
-        currentSession: mockSession,
-        expiresAt: Math.floor(Date.now() / 1000) + 3600
-      }))
+      localStorage.setItem(
+        supabaseKey,
+        JSON.stringify({
+          currentSession: mockSession,
+          expiresAt: Math.floor(Date.now() / 1000) + 3600,
+        })
+      )
     }, tokens)
 
     return tokens.user
@@ -97,7 +100,7 @@ export async function logout(page: Page) {
   } catch {
     // Ignore navigation errors - we just need any valid page
   }
-  
+
   await page.evaluate(() => {
     localStorage.removeItem('finito_auth_token')
     localStorage.removeItem('gmail_access_token')
@@ -115,9 +118,9 @@ export async function isAuthenticated(page: Page): Promise<boolean> {
   return await page.evaluate(() => {
     const token = localStorage.getItem('finito_auth_token')
     const expires = localStorage.getItem('gmail_token_expires')
-    
+
     if (!token || !expires) return false
-    
+
     return parseInt(expires) > Date.now()
   })
 }

@@ -24,7 +24,7 @@ function formatDistanceToNow(dateString: string): string {
   const date = new Date(dateString)
   const now = new Date()
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-  
+
   if (diffInSeconds < 60) {
     return 'just now'
   } else if (diffInSeconds < 3600) {
@@ -48,7 +48,7 @@ export function EmailRow({ email }: EmailRowProps) {
     setSelectedEmailId,
     toggleEmailSelection,
     selectedEmailIds,
-    getEmailWithOptimisticUpdates
+    getEmailWithOptimisticUpdates,
   } = useEmailStore()
 
   // Apply optimistic updates to email display
@@ -87,7 +87,7 @@ export function EmailRow({ email }: EmailRowProps) {
       <div
         data-checkbox
         className="flex-shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <Checkbox
           checked={isSelected}
@@ -104,9 +104,7 @@ export function EmailRow({ email }: EmailRowProps) {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-sm truncate">
-            {displayName}
-          </span>
+          <span className="text-sm truncate">{displayName}</span>
           <span className="text-xs text-muted-foreground">
             {formatDistanceToNow(email.received_at)}
           </span>
@@ -117,9 +115,7 @@ export function EmailRow({ email }: EmailRowProps) {
 
       {/* Indicators */}
       <div className="flex-shrink-0 flex items-center gap-2">
-        {!displayEmail.is_read && (
-          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-        )}
+        {!displayEmail.is_read && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
       </div>
     </div>
   )

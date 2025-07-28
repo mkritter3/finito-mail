@@ -17,7 +17,7 @@ export function BulkActionsToolbar({
   onMarkAsRead,
   onMarkAsUnread,
   onDelete,
-  isPending
+  isPending,
 }: BulkActionsToolbarProps) {
   const { selectedEmailIds, clearSelection } = useEmailStore()
   const selectedCount = selectedEmailIds.size
@@ -70,11 +70,7 @@ export function BulkActionsToolbar({
           disabled={isPending}
           className="h-8 px-3 hover:bg-blue-100"
         >
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Mail className="h-4 w-4" />
-          )}
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
           <span className="ml-1">Mark Unread</span>
         </Button>
 

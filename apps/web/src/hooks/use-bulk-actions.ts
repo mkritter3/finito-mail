@@ -1,17 +1,18 @@
 import { useState } from 'react'
 import { useEmailStore } from '@/stores/email-store'
-import { bulkActionsService, BulkAction, BulkActionRequest, BulkActionResponse } from '@/services/bulk-actions'
+import {
+  bulkActionsService,
+  BulkAction,
+  BulkActionRequest,
+  BulkActionResponse,
+} from '@/services/bulk-actions'
 
 export function useBulkActions() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
-  const {
-    selectedEmailIds,
-    clearSelection,
-    setBulkActionInProgress,
-    bulkActionInProgress
-  } = useEmailStore()
+
+  const { selectedEmailIds, clearSelection, setBulkActionInProgress, bulkActionInProgress } =
+    useEmailStore()
 
   const executeBulkAction = async (
     action: BulkAction,
@@ -26,7 +27,7 @@ export function useBulkActions() {
     const request: BulkActionRequest = {
       emailIds,
       action,
-      labelId
+      labelId,
     }
 
     // Validate request
@@ -42,19 +43,19 @@ export function useBulkActions() {
 
     try {
       const result = await bulkActionsService.executeBulkAction(request)
-      
+
       // Clear selection after successful action
       if (result.success) {
         clearSelection()
       }
-      
+
       // Set error if there were failures
       if (result.failed > 0) {
         const failedCount = result.failed
         const totalCount = result.processed
         setError(`${failedCount} out of ${totalCount} emails failed to process`)
       }
-      
+
       return result
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Bulk action failed'
@@ -82,7 +83,7 @@ export function useBulkActions() {
     selectedCount: selectedEmailIds.size,
     hasSelection: selectedEmailIds.size > 0,
     bulkActionInProgress,
-    
+
     // Actions
     executeBulkAction,
     markAsRead,
@@ -92,7 +93,7 @@ export function useBulkActions() {
     addLabel,
     removeLabel,
     clearError,
-    
+
     // Utilities
     getActionDisplayName: bulkActionsService.getActionDisplayName,
     getActionIcon: bulkActionsService.getActionIcon,

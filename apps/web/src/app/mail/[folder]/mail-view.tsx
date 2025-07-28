@@ -6,7 +6,6 @@ import { EmailView } from '@/components/email-view'
 import { BulkActionsToolbar } from '@/components/bulk-actions-toolbar'
 import { useEmailStore } from '@/stores/email-store'
 import { useBulkMailActions } from '@/hooks/use-bulk-mail-actions'
-import { toast } from 'sonner'
 
 export interface EmailMetadata {
   id: string
@@ -36,23 +35,23 @@ function emailOptimisticReducer(
     case 'archive':
       // Filter out archived emails from the current view
       return currentEmails.filter(email => !ids.includes(email.id))
-    
+
     case 'delete':
       // Filter out deleted emails
       return currentEmails.filter(email => !ids.includes(email.id))
-    
+
     case 'mark_read':
       // Update is_read status
       return currentEmails.map(email =>
         ids.includes(email.id) ? { ...email, is_read: true } : email
       )
-    
+
     case 'mark_unread':
       // Update is_read status
       return currentEmails.map(email =>
         ids.includes(email.id) ? { ...email, is_read: false } : email
       )
-    
+
     default:
       return currentEmails
   }
@@ -63,10 +62,10 @@ export function MailView({ initialEmails, folder }: MailViewProps) {
     initialEmails,
     emailOptimisticReducer
   )
-  
+
   const [isPending, startTransition] = useTransition()
   const { selectedEmailIds, clearSelection } = useEmailStore()
-  const selectedEmailId = useEmailStore((state) => state.selectedEmailId)
+  const selectedEmailId = useEmailStore(state => state.selectedEmailId)
   const { archive, markAsRead, markAsUnread, deleteEmails } = useBulkMailActions()
 
   // Handler functions that apply optimistic updates then call server actions
@@ -77,7 +76,7 @@ export function MailView({ initialEmails, folder }: MailViewProps) {
     startTransition(async () => {
       // Apply optimistic update
       setOptimisticEmails({ action: 'archive', ids })
-      
+
       try {
         // Call server action
         await archive(ids)
@@ -96,7 +95,7 @@ export function MailView({ initialEmails, folder }: MailViewProps) {
 
     startTransition(async () => {
       setOptimisticEmails({ action: 'mark_read', ids })
-      
+
       try {
         await markAsRead(ids)
         clearSelection()
@@ -112,7 +111,7 @@ export function MailView({ initialEmails, folder }: MailViewProps) {
 
     startTransition(async () => {
       setOptimisticEmails({ action: 'mark_unread', ids })
-      
+
       try {
         await markAsUnread(ids)
         clearSelection()
@@ -128,7 +127,7 @@ export function MailView({ initialEmails, folder }: MailViewProps) {
 
     startTransition(async () => {
       setOptimisticEmails({ action: 'delete', ids })
-      
+
       try {
         await deleteEmails(ids)
         clearSelection()

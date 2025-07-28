@@ -27,20 +27,15 @@ export function KeyboardShortcutsDialog({ isOpen, onClose }: KeyboardShortcutsDi
       <div className="bg-background rounded-lg shadow-xl w-full max-w-2xl">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold">Keyboard Shortcuts</h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-accent rounded-md"
-          >
+          <button onClick={onClose} className="p-1 hover:bg-accent rounded-md">
             ✕
           </button>
         </div>
         <div className="p-4 max-h-[60vh] overflow-auto">
           <div className="grid grid-cols-2 gap-4">
-            {shortcuts.map((shortcut) => (
+            {shortcuts.map(shortcut => (
               <div key={shortcut.key} className="flex items-center gap-4">
-                <kbd className="px-2 py-1 bg-muted rounded text-sm font-mono">
-                  {shortcut.key}
-                </kbd>
+                <kbd className="px-2 py-1 bg-muted rounded text-sm font-mono">{shortcut.key}</kbd>
                 <span className="text-sm">{shortcut.description}</span>
               </div>
             ))}

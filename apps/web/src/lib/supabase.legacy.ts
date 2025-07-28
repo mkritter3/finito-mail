@@ -8,15 +8,18 @@ export const supabase = createClient(
 
 // Helper to get Gmail tokens from session
 export async function getGmailTokens() {
-  const { data: { session }, error } = await supabase.auth.getSession()
-  
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession()
+
   if (error || !session) {
     return null
   }
-  
+
   return {
     accessToken: session.provider_token,
     refreshToken: session.provider_refresh_token,
-    expiresAt: session.expires_at
+    expiresAt: session.expires_at,
   }
 }

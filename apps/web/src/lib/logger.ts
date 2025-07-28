@@ -11,7 +11,7 @@ import * as Sentry from '@sentry/nextjs'
 const baseConfig: pino.LoggerOptions = {
   level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
   formatters: {
-    level: (label) => {
+    level: label => {
       return { level: label }
     },
   },
@@ -61,9 +61,7 @@ const devConfig: pino.LoggerOptions = {
 const prodConfig: pino.LoggerOptions = baseConfig
 
 // Create the base logger
-export const logger = pino(
-  process.env.NODE_ENV === 'production' ? prodConfig : devConfig
-)
+export const logger = pino(process.env.NODE_ENV === 'production' ? prodConfig : devConfig)
 
 /**
  * Create a scoped logger with additional context and Sentry integration
@@ -71,7 +69,7 @@ export const logger = pino(
  */
 export function createScopedLogger(context: string) {
   const scopedLogger = logger.child({ context })
-  
+
   return {
     ...scopedLogger,
     // Enhanced error logging with Sentry
@@ -105,29 +103,31 @@ export function createScopedLogger(context: string) {
     // Performance tracking
     time: (label: string) => {
       const start = Date.now()
-      
+
       // Get the currently active span (from auto-instrumentation or manual)
       const activeSpan = Sentry.getActiveSpan()
-      
+
       // Create a child span if an active span exists
-      const span = activeSpan ? Sentry.startInactiveSpan({
-        op: 'function',
-        name: `${context}.${label}`,
-      }) : undefined
-      
+      const span = activeSpan
+        ? Sentry.startInactiveSpan({
+            op: 'function',
+            name: `${context}.${label}`,
+          })
+        : undefined
+
       return {
         end: (meta?: Record<string, any>) => {
           const duration = Date.now() - start
-          
+
           // Always log to our structured logger
           scopedLogger.info(`${label} completed`, {
             duration,
             ...meta,
           })
-          
+
           // End the span if it exists
           span?.end()
-          
+
           // Log slow operations to Sentry
           if (duration > 1000) {
             // Add data to the span for better context
@@ -138,7 +138,7 @@ export function createScopedLogger(context: string) {
                 span?.setAttribute(key, String(value))
               })
             }
-            
+
             // Also send a warning message
             Sentry.captureMessage(`Slow operation: ${context}.${label}`, {
               level: 'warning',
@@ -146,7 +146,7 @@ export function createScopedLogger(context: string) {
               tags: { context, operation: label, slow_operation: 'true' },
             })
           }
-          
+
           return duration
         },
       }
@@ -176,19 +176,19 @@ export function withLogging<T extends (...args: any[]) => any>(
     const start = Date.now()
     const requestId = crypto.randomUUID()
     const requestLogger = createScopedLogger(options?.context || 'api')
-    
+
     // Get the active span that Sentry auto-instrumentation created
     const activeSpan = Sentry.getActiveSpan()
     const scope = Sentry.getCurrentScope()
-    
+
     // Add custom context to the existing scope
     scope.setTag('requestId', requestId)
-    scope.setContext('request_details', { 
+    scope.setContext('request_details', {
       requestId,
       handler: options?.name || handler.name || 'anonymous',
-      context: options?.context || 'api'
+      context: options?.context || 'api',
     })
-    
+
     // If there's an active span, we can also add custom data
     if (activeSpan) {
       activeSpan.setAttribute('requestId', requestId)
@@ -200,27 +200,27 @@ export function withLogging<T extends (...args: any[]) => any>(
         handler: options?.name || handler.name,
         requestId,
       })
-      
+
       const result = await handler(...args)
       const duration = Date.now() - start
-      
+
       requestLogger.info('Request completed', {
         handler: options?.name || handler.name,
         requestId,
         duration,
       })
-      
+
       // The transaction status is automatically managed by Sentry
       return result
     } catch (error) {
       const duration = Date.now() - start
-      
+
       requestLogger.error(error instanceof Error ? error : new Error(String(error)), {
         handler: options?.name || handler.name,
         requestId,
         duration,
       })
-      
+
       // Sentry auto-instrumentation will handle the error status
       throw error
     }

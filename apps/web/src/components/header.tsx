@@ -53,23 +53,19 @@ export function Header() {
           <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
           {isSyncing ? 'Syncing...' : 'Sync'}
         </button>
-        <span className="text-xs text-muted-foreground">
-          {formatLastSync()}
-        </span>
+        <span className="text-xs text-muted-foreground">{formatLastSync()}</span>
       </div>
-      
+
       <h1 className="text-xl font-semibold">Finito Mail</h1>
-      
+
       {/* Account info */}
       <div className="flex-1 flex items-center justify-end gap-4">
-        <button className="text-sm text-muted-foreground hover:text-foreground">
-          Settings
-        </button>
+        <button className="text-sm text-muted-foreground hover:text-foreground">Settings</button>
         {user && (
           <div className="relative">
-            <button 
+            <button
               className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-medium text-white relative z-10"
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation()
                 const dropdown = e.currentTarget.nextElementSibling
                 if (dropdown) {

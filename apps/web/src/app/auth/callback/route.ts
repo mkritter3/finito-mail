@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (code) {
     // Use the regular server client for auth operations
     const supabase = await createClient()
-    
+
     // Exchange the code for a session
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       // Store provider tokens securely in the database
       if (provider_token && provider_refresh_token) {
         console.log('Storing provider tokens for user:', user.id)
-        
+
         // Create a service role client for admin operations
         const supabaseAdmin = createServerClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,10 +32,10 @@ export async function GET(request: NextRequest) {
               getAll() {
                 return request.cookies.getAll()
               },
-              setAll(cookiesToSet) {
+              setAll(_cookiesToSet) {
                 // We don't need to set cookies for the admin client
-              }
-            }
+              },
+            },
           }
         )
 
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
           p_user_id: user.id,
           p_access_token: provider_token,
           p_refresh_token: provider_refresh_token,
-          p_token_expiry: new Date(Date.now() + 3600 * 1000).toISOString() // 1 hour from now
+          p_token_expiry: new Date(Date.now() + 3600 * 1000).toISOString(), // 1 hour from now
         })
 
         if (storeError) {

@@ -50,7 +50,12 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           aria-label="Toggle sidebar"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
         </button>
       </div>
@@ -70,7 +75,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
       {/* Special items */}
       <nav className="space-y-1 px-2 mb-4">
-        {specialItems.map((item) => {
+        {specialItems.map(item => {
           const isActive = pathname === item.href
           return (
             <Link
@@ -84,9 +89,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
               )}
             >
               <span className="text-lg">{item.icon}</span>
-              {isOpen && (
-                <span className="flex-1 font-medium">{item.label}</span>
-              )}
+              {isOpen && <span className="flex-1 font-medium">{item.label}</span>}
             </Link>
           )
         })}
@@ -97,7 +100,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
       {/* Folder list */}
       <nav className="space-y-1 px-2">
-        {folders.map((folder) => {
+        {folders.map(folder => {
           const isActive = pathname.includes(`/mail/${folder.id}`)
           return (
             <Link
@@ -111,9 +114,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
               )}
             >
               <span className="text-lg">{folder.icon}</span>
-              {isOpen && (
-                <span className="flex-1">{folder.label}</span>
-              )}
+              {isOpen && <span className="flex-1">{folder.label}</span>}
               {isOpen && folder.id === 'inbox' && unreadCount > 0 && (
                 <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
                   {unreadCount}

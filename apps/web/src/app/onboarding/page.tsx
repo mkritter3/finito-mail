@@ -87,16 +87,16 @@ export default function OnboardingPage() {
 
   const handleAcceptSuggestion = async (suggestion: OnboardingSuggestion) => {
     setProcessingIds(prev => new Set(prev).add(suggestion.id))
-    
+
     try {
       const response = await fetch(`/api/onboarding/suggestions/${suggestion.id}/accept`, {
-        method: 'POST'
+        method: 'POST',
       })
-      
+
       if (response.ok) {
         // Remove from suggestions list
         setSuggestions(prev => prev.filter(s => s.id !== suggestion.id))
-        
+
         // Show success message
         console.log('Suggestion accepted successfully')
       } else {
@@ -115,12 +115,12 @@ export default function OnboardingPage() {
 
   const handleRejectSuggestion = async (suggestion: OnboardingSuggestion) => {
     setProcessingIds(prev => new Set(prev).add(suggestion.id))
-    
+
     try {
       const response = await fetch(`/api/onboarding/suggestions/${suggestion.id}/reject`, {
-        method: 'POST'
+        method: 'POST',
       })
-      
+
       if (response.ok) {
         // Remove from suggestions list
         setSuggestions(prev => prev.filter(s => s.id !== suggestion.id))
@@ -179,20 +179,22 @@ export default function OnboardingPage() {
   }
 
   const getActionDescription = (actions: Array<{ type: string; value?: string }>) => {
-    return actions.map(action => {
-      switch (action.type) {
-        case 'add_label':
-          return `Add label: ${action.value}`
-        case 'archive':
-          return 'Archive automatically'
-        case 'mark_read':
-          return 'Mark as read'
-        case 'stop_processing':
-          return 'Stop further processing'
-        default:
-          return action.type
-      }
-    }).join(', ')
+    return actions
+      .map(action => {
+        switch (action.type) {
+          case 'add_label':
+            return `Add label: ${action.value}`
+          case 'archive':
+            return 'Archive automatically'
+          case 'mark_read':
+            return 'Mark as read'
+          case 'stop_processing':
+            return 'Stop further processing'
+          default:
+            return action.type
+        }
+      })
+      .join(', ')
   }
 
   if (loading) {
@@ -211,13 +213,13 @@ export default function OnboardingPage() {
           <h1 className="text-3xl font-bold">Instant Triage</h1>
         </div>
         <p className="text-gray-600">
-          We've analyzed your emails and found patterns that could save you time. 
-          Accept these suggestions to automatically organize your inbox.
+          We've analyzed your emails and found patterns that could save you time. Accept these
+          suggestions to automatically organize your inbox.
         </p>
-        
+
         <div className="flex gap-2 mt-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => {
               setShowMetrics(!showMetrics)
               if (!showMetrics && !metrics) fetchMetrics()
@@ -241,7 +243,7 @@ export default function OnboardingPage() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Analysis Performance</CardTitle>
@@ -253,7 +255,7 @@ export default function OnboardingPage() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Confidence Score</CardTitle>
@@ -274,39 +276,30 @@ export default function OnboardingPage() {
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">All caught up!</h3>
             <p className="text-gray-600">
-              No new suggestions at the moment. We'll analyze your emails and suggest 
-              new rules as patterns emerge.
+              No new suggestions at the moment. We'll analyze your emails and suggest new rules as
+              patterns emerge.
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
-          {suggestions.map((suggestion) => (
+          {suggestions.map(suggestion => (
             <Card key={suggestion.id} className="transition-all hover:shadow-md">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {getSuggestionIcon(suggestion.suggestion_type)}
                     <div>
-                      <CardTitle className="text-lg">
-                        {getSuggestionTitle(suggestion)}
-                      </CardTitle>
-                      <CardDescription>
-                        {getSuggestionDescription(suggestion)}
-                      </CardDescription>
+                      <CardTitle className="text-lg">{getSuggestionTitle(suggestion)}</CardTitle>
+                      <CardDescription>{getSuggestionDescription(suggestion)}</CardDescription>
                     </div>
                   </div>
-                  <Badge 
-                    className={cn(
-                      'text-xs',
-                      getConfidenceColor(suggestion.confidence_score)
-                    )}
-                  >
+                  <Badge className={cn('text-xs', getConfidenceColor(suggestion.confidence_score))}>
                     {Math.round(suggestion.confidence_score * 100)}% confidence
                   </Badge>
                 </div>
               </CardHeader>
-              
+
               <CardContent>
                 <div className="space-y-4">
                   {/* Sample subjects */}
@@ -320,21 +313,23 @@ export default function OnboardingPage() {
                       ))}
                     </div>
                   </div>
-                  
+
                   {/* Suggested rule */}
                   <div>
                     <h4 className="font-medium mb-2">Suggested rule:</h4>
                     <div className="bg-blue-50 p-3 rounded-lg">
-                      <div className="font-medium text-blue-900">{suggestion.suggested_rule.name}</div>
+                      <div className="font-medium text-blue-900">
+                        {suggestion.suggested_rule.name}
+                      </div>
                       <div className="text-sm text-blue-700 mt-1">
                         Actions: {getActionDescription(suggestion.suggested_rule.actions)}
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Actions */}
                   <div className="flex gap-2 pt-2">
-                    <Button 
+                    <Button
                       onClick={() => handleAcceptSuggestion(suggestion)}
                       disabled={processingIds.has(suggestion.id)}
                       className="flex-1"
@@ -346,8 +341,8 @@ export default function OnboardingPage() {
                       )}
                       Accept & Create Rule
                     </Button>
-                    
-                    <Button 
+
+                    <Button
                       variant="outline"
                       onClick={() => handleRejectSuggestion(suggestion)}
                       disabled={processingIds.has(suggestion.id)}
@@ -373,7 +368,7 @@ export default function OnboardingPage() {
             <span className="font-medium text-blue-900">Next steps</span>
           </div>
           <p className="text-sm text-blue-800">
-            After accepting suggestions, your new rules will automatically organize incoming emails. 
+            After accepting suggestions, your new rules will automatically organize incoming emails.
             You can modify or disable these rules anytime in the Rules management section.
           </p>
         </div>

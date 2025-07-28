@@ -23,12 +23,7 @@ interface ComposeDialogProps {
   mode?: 'compose' | 'reply' | 'replyAll' | 'forward'
 }
 
-export function ComposeDialog({ 
-  isOpen, 
-  onClose, 
-  replyTo,
-  mode = 'compose' 
-}: ComposeDialogProps) {
+export function ComposeDialog({ isOpen, onClose, replyTo, mode = 'compose' }: ComposeDialogProps) {
   // const { } = useAuth()
   const [to, setTo] = useState('')
   const [cc, setCc] = useState('')
@@ -46,19 +41,28 @@ export function ComposeDialog({
       if (mode === 'reply' && replyTo) {
         setTo(replyTo.from.email)
         setSubject(`Re: ${replyTo.subject.replace(/^Re:\s*/i, '')}`)
-        setBody(`\n\nOn ${new Date().toLocaleDateString()}, ${replyTo.from.name || replyTo.from.email} wrote:\n> ${getQuotedText()}`)
+        setBody(
+          `\n\nOn ${new Date().toLocaleDateString()}, ${replyTo.from.name || replyTo.from.email} wrote:\n> ${getQuotedText()}`
+        )
       } else if (mode === 'replyAll' && replyTo) {
-        const toAddresses = [replyTo.from, ...replyTo.to.filter(addr => addr.email !== 'user@gmail.com')]
+        const toAddresses = [
+          replyTo.from,
+          ...replyTo.to.filter(addr => addr.email !== 'user@gmail.com'),
+        ]
         setTo(toAddresses.map(addr => addr.email).join(', '))
         if (replyTo.cc && replyTo.cc.length > 0) {
           setCc(replyTo.cc.map(addr => addr.email).join(', '))
           setShowCc(true)
         }
         setSubject(`Re: ${replyTo.subject.replace(/^Re:\s*/i, '')}`)
-        setBody(`\n\nOn ${new Date().toLocaleDateString()}, ${replyTo.from.name || replyTo.from.email} wrote:\n> ${getQuotedText()}`)
+        setBody(
+          `\n\nOn ${new Date().toLocaleDateString()}, ${replyTo.from.name || replyTo.from.email} wrote:\n> ${getQuotedText()}`
+        )
       } else if (mode === 'forward' && replyTo) {
         setSubject(`Fwd: ${replyTo.subject.replace(/^Fwd:\s*/i, '')}`)
-        setBody(`\n\n---------- Forwarded message ---------\nFrom: ${replyTo.from.name || replyTo.from.email} <${replyTo.from.email}>\nDate: ${new Date().toLocaleDateString()}\nSubject: ${replyTo.subject}\nTo: ${replyTo.to.map(addr => addr.email).join(', ')}\n\n${getQuotedText()}`)
+        setBody(
+          `\n\n---------- Forwarded message ---------\nFrom: ${replyTo.from.name || replyTo.from.email} <${replyTo.from.email}>\nDate: ${new Date().toLocaleDateString()}\nSubject: ${replyTo.subject}\nTo: ${replyTo.to.map(addr => addr.email).join(', ')}\n\n${getQuotedText()}`
+        )
       } else {
         // Clear for new compose
         setTo('')
@@ -69,7 +73,7 @@ export function ComposeDialog({
         setShowCc(false)
         setShowBcc(false)
       }
-      
+
       // Focus the appropriate field
       setTimeout(() => {
         if (mode === 'compose') {
@@ -92,7 +96,7 @@ export function ComposeDialog({
 
     try {
       setIsSending(true)
-      
+
       // Use Server Action to send email
       const result = await sendEmail({
         to,
@@ -100,18 +104,20 @@ export function ComposeDialog({
         bcc: bcc || undefined,
         subject,
         body,
-        threadId: mode !== 'compose' ? replyTo?.threadId : undefined
+        threadId: mode !== 'compose' ? replyTo?.threadId : undefined,
       })
 
       if (result.data?.success) {
         // Close dialog and show success
         onClose()
-        console.log('Email sent successfully', { messageId: result.data.messageId, threadId: result.data.threadId })
+        console.log('Email sent successfully', {
+          messageId: result.data.messageId,
+          threadId: result.data.threadId,
+        })
       } else {
         console.error('Failed to send email:', result.error)
         // In a real app, show an error toast
       }
-
     } catch (error) {
       console.error('Failed to send email:', error)
       // In a real app, show an error toast
@@ -156,15 +162,15 @@ export function ComposeDialog({
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border">
               <h2 className="text-lg font-semibold">
-                {mode === 'compose' ? 'New Message' : 
-                 mode === 'reply' ? 'Reply' :
-                 mode === 'replyAll' ? 'Reply All' :
-                 'Forward'}
+                {mode === 'compose'
+                  ? 'New Message'
+                  : mode === 'reply'
+                    ? 'Reply'
+                    : mode === 'replyAll'
+                      ? 'Reply All'
+                      : 'Forward'}
               </h2>
-              <button
-                onClick={onClose}
-                className="p-1 hover:bg-muted rounded transition-colors"
-              >
+              <button onClick={onClose} className="p-1 hover:bg-muted rounded transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -174,14 +180,17 @@ export function ComposeDialog({
               <div className="p-4 space-y-3">
                 {/* To */}
                 <div className="flex items-center gap-2">
-                  <label htmlFor="compose-to" className="text-sm font-medium text-muted-foreground w-12">
+                  <label
+                    htmlFor="compose-to"
+                    className="text-sm font-medium text-muted-foreground w-12"
+                  >
                     To
                   </label>
                   <input
                     id="compose-to"
                     type="email"
                     value={to}
-                    onChange={(e) => setTo(e.target.value)}
+                    onChange={e => setTo(e.target.value)}
                     placeholder="Recipients"
                     className="flex-1 px-3 py-1.5 text-sm bg-transparent border-0 outline-none focus:ring-1 focus:ring-blue-500 rounded"
                     multiple
@@ -203,14 +212,17 @@ export function ComposeDialog({
                 {/* Cc */}
                 {showCc && (
                   <div className="flex items-center gap-2">
-                    <label htmlFor="compose-cc" className="text-sm font-medium text-muted-foreground w-12">
+                    <label
+                      htmlFor="compose-cc"
+                      className="text-sm font-medium text-muted-foreground w-12"
+                    >
                       Cc
                     </label>
                     <input
                       id="compose-cc"
                       type="email"
                       value={cc}
-                      onChange={(e) => setCc(e.target.value)}
+                      onChange={e => setCc(e.target.value)}
                       placeholder="Cc recipients"
                       className="flex-1 px-3 py-1.5 text-sm bg-transparent border-0 outline-none focus:ring-1 focus:ring-blue-500 rounded"
                       multiple
@@ -221,14 +233,17 @@ export function ComposeDialog({
                 {/* Bcc */}
                 {showBcc && (
                   <div className="flex items-center gap-2">
-                    <label htmlFor="compose-bcc" className="text-sm font-medium text-muted-foreground w-12">
+                    <label
+                      htmlFor="compose-bcc"
+                      className="text-sm font-medium text-muted-foreground w-12"
+                    >
                       Bcc
                     </label>
                     <input
                       id="compose-bcc"
                       type="email"
                       value={bcc}
-                      onChange={(e) => setBcc(e.target.value)}
+                      onChange={e => setBcc(e.target.value)}
                       placeholder="Bcc recipients"
                       className="flex-1 px-3 py-1.5 text-sm bg-transparent border-0 outline-none focus:ring-1 focus:ring-blue-500 rounded"
                       multiple
@@ -238,14 +253,17 @@ export function ComposeDialog({
 
                 {/* Subject */}
                 <div className="flex items-center gap-2">
-                  <label htmlFor="compose-subject" className="text-sm font-medium text-muted-foreground w-12">
+                  <label
+                    htmlFor="compose-subject"
+                    className="text-sm font-medium text-muted-foreground w-12"
+                  >
                     Subject
                   </label>
                   <input
                     id="compose-subject"
                     type="text"
                     value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
+                    onChange={e => setSubject(e.target.value)}
                     placeholder="Subject"
                     className="flex-1 px-3 py-1.5 text-sm bg-transparent border-0 outline-none focus:ring-1 focus:ring-blue-500 rounded"
                   />
@@ -256,7 +274,7 @@ export function ComposeDialog({
                   <textarea
                     ref={bodyRef}
                     value={body}
-                    onChange={(e) => setBody(e.target.value)}
+                    onChange={e => setBody(e.target.value)}
                     placeholder="Compose your message..."
                     className="w-full min-h-[300px] px-3 py-2 text-sm bg-transparent border-0 outline-none resize-none focus:ring-1 focus:ring-blue-500 rounded"
                   />
@@ -267,19 +285,34 @@ export function ComposeDialog({
             {/* Footer */}
             <div className="flex items-center justify-between p-4 border-t border-border bg-muted/30">
               <div className="flex items-center gap-2">
-                <button className="p-2 hover:bg-muted rounded transition-colors" title="Attach files">
+                <button
+                  className="p-2 hover:bg-muted rounded transition-colors"
+                  title="Attach files"
+                >
                   <Paperclip className="w-4 h-4" />
                 </button>
-                <button className="p-2 hover:bg-muted rounded transition-colors" title="Insert image">
+                <button
+                  className="p-2 hover:bg-muted rounded transition-colors"
+                  title="Insert image"
+                >
                   <Image className="w-4 h-4" />
                 </button>
-                <button className="p-2 hover:bg-muted rounded transition-colors" title="Insert link">
+                <button
+                  className="p-2 hover:bg-muted rounded transition-colors"
+                  title="Insert link"
+                >
                   <Link className="w-4 h-4" />
                 </button>
-                <button className="p-2 hover:bg-muted rounded transition-colors" title="Insert emoji">
+                <button
+                  className="p-2 hover:bg-muted rounded transition-colors"
+                  title="Insert emoji"
+                >
                   <Smile className="w-4 h-4" />
                 </button>
-                <button className="p-2 hover:bg-muted rounded transition-colors" title="More options">
+                <button
+                  className="p-2 hover:bg-muted rounded transition-colors"
+                  title="More options"
+                >
                   <MoreVertical className="w-4 h-4" />
                 </button>
               </div>

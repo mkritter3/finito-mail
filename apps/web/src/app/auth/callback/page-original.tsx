@@ -34,8 +34,8 @@ function AuthCallbackContent() {
         // Verify token with API
         const response = await fetch('/api/auth/me', {
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         })
 
         if (!response.ok) {
@@ -51,9 +51,9 @@ function AuthCallbackContent() {
           const syncResponse = await fetch('/api/emails', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
           })
 
           if (syncResponse.ok) {
@@ -72,7 +72,7 @@ function AuthCallbackContent() {
         console.error('Auth callback error:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
         setIsProcessing(false)
-        
+
         // Redirect back to auth page after delay
         setTimeout(() => {
           router.push('/auth')
@@ -121,11 +121,13 @@ function AuthCallbackContent() {
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      }
+    >
       <AuthCallbackContent />
     </Suspense>
   )

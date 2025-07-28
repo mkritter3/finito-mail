@@ -18,7 +18,7 @@ export enum SSEMessageType {
   EMAIL_DELETE = 'email_delete',
   SYNC_COMPLETE = 'sync_complete',
   HEARTBEAT = 'heartbeat',
-  ERROR = 'error'
+  ERROR = 'error',
 }
 
 export interface SSEMessage {
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   const timer = logger.time('sse-connection')
   let subscriber: Redis | null = null
   let heartbeatInterval: NodeJS.Timeout | null = null
-  
+
   try {
     // Get session from Supabase
     const { createServerClient } = await import('@supabase/ssr')
@@ -49,32 +49,35 @@ export async function GET(request: NextRequest) {
         cookies: {
           get(name: string) {
             return cookieStore.get(name)?.value
-          }
-        }
+          },
+        },
       }
     )
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
+
     if (sessionError || !session?.user?.id) {
       logger.warn('Unauthorized SSE connection attempt')
       timer.end({ status: 'unauthorized' })
       return new Response('Unauthorized', { status: 401 })
     }
-    
+
     const userId = session.user.id
     const channel = `user:${userId}:updates`
-    
+
     logger.info('SSE connection established', { userId, channel })
-    
+
     // Create Redis subscriber for this connection
     subscriber = createSubscriberClient()
     await subscriber.connect()
-    
+
     // Create a ReadableStream for SSE
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder()
-        
+
         // Handle Redis messages
         const handleMessage = (receivedChannel: string, message: string) => {
           if (receivedChannel === channel) {
@@ -83,31 +86,41 @@ export async function GET(request: NextRequest) {
               const sseMessage = JSON.parse(message) as SSEMessage
               controller.enqueue(encoder.encode(formatSSEMessage(sseMessage)))
             } catch (error) {
-              logger.error(error instanceof Error ? error : new Error('Failed to parse Redis message'))
+              logger.error(
+                error instanceof Error ? error : new Error('Failed to parse Redis message')
+              )
             }
           }
         }
-        
+
         // Subscribe to user's channel
         subscriber!.on('message', handleMessage)
         await subscriber!.subscribe(channel)
         logger.debug('Subscribed to Redis channel', { channel })
-        
+
         // Send initial connection message
-        controller.enqueue(encoder.encode(formatSSEMessage({
-          type: SSEMessageType.SYNC_COMPLETE,
-          data: { message: 'Connected to email updates' },
-          timestamp: new Date().toISOString()
-        })))
-        
+        controller.enqueue(
+          encoder.encode(
+            formatSSEMessage({
+              type: SSEMessageType.SYNC_COMPLETE,
+              data: { message: 'Connected to email updates' },
+              timestamp: new Date().toISOString(),
+            })
+          )
+        )
+
         // Set up heartbeat to keep connection alive
         heartbeatInterval = setInterval(() => {
           try {
-            controller.enqueue(encoder.encode(formatSSEMessage({
-              type: SSEMessageType.HEARTBEAT,
-              data: { timestamp: Date.now() },
-              timestamp: new Date().toISOString()
-            })))
+            controller.enqueue(
+              encoder.encode(
+                formatSSEMessage({
+                  type: SSEMessageType.HEARTBEAT,
+                  data: { timestamp: Date.now() },
+                  timestamp: new Date().toISOString(),
+                })
+              )
+            )
           } catch (error) {
             // Connection closed, stop heartbeat
             if (heartbeatInterval) {
@@ -116,62 +129,61 @@ export async function GET(request: NextRequest) {
             }
           }
         }, 30000) // Every 30 seconds
-        
+
         // Handle client disconnect
         request.signal.addEventListener('abort', async () => {
           logger.info('SSE connection aborted by client', { userId })
-          
+
           // Cleanup
           if (heartbeatInterval) {
             clearInterval(heartbeatInterval)
             heartbeatInterval = null
           }
-          
+
           if (subscriber && subscriber.status === 'ready') {
             await subscriber.unsubscribe(channel)
             await subscriber.quit()
           }
-          
+
           controller.close()
           timer.end({ status: 'closed' })
         })
       },
-      
+
       cancel() {
         // Called when the reader cancels the stream
         logger.debug('SSE stream cancelled')
-        
+
         if (heartbeatInterval) {
           clearInterval(heartbeatInterval)
           heartbeatInterval = null
         }
-      }
+      },
     })
-    
+
     // Return SSE response
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
         'X-Accel-Buffering': 'no', // Disable Nginx buffering
       },
     })
-    
   } catch (error) {
     logger.error(error instanceof Error ? error : new Error('SSE setup failed'))
-    
+
     // Cleanup on error
     if (heartbeatInterval) {
       clearInterval(heartbeatInterval)
     }
-    
+
     if (subscriber && subscriber.status === 'ready') {
       await subscriber.quit()
     }
-    
+
     timer.end({ status: 'error' })
-    
+
     return new Response('Internal Server Error', { status: 500 })
   }
 }

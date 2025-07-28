@@ -1,52 +1,50 @@
 'use client'
 
-import { useAsyncSync } from '@/hooks/use-async-sync';
-import { RefreshCw, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { formatDistanceToNow } from '@/lib/date';
+import { useAsyncSync } from '@/hooks/use-async-sync'
+import { RefreshCw, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { formatDistanceToNow } from '@/lib/date'
 
 export function SyncStatus() {
-  const { currentSync, isLoading, error, startSync } = useAsyncSync();
+  const { currentSync, isLoading, error, startSync } = useAsyncSync()
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
+        return <Clock className="w-4 h-4 text-yellow-500" />
       case 'processing':
-        return <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />;
+        return <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
       case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-green-500" />
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="w-4 h-4 text-red-500" />
       default:
-        return <RefreshCw className="w-4 h-4 text-gray-500" />;
+        return <RefreshCw className="w-4 h-4 text-gray-500" />
     }
-  };
+  }
 
   const getStatusText = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'Sync queued';
+        return 'Sync queued'
       case 'processing':
-        return 'Syncing emails...';
+        return 'Syncing emails...'
       case 'completed':
-        return 'Sync complete';
+        return 'Sync complete'
       case 'failed':
-        return 'Sync failed';
+        return 'Sync failed'
       default:
-        return 'Ready to sync';
+        return 'Ready to sync'
     }
-  };
+  }
 
-  const isActive = currentSync?.status === 'pending' || currentSync?.status === 'processing';
+  const isActive = currentSync?.status === 'pending' || currentSync?.status === 'processing'
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md">
       {/* Status Icon */}
       <div className="flex items-center gap-2">
         {getStatusIcon(currentSync?.status || 'idle')}
-        <span className="text-sm font-medium">
-          {getStatusText(currentSync?.status || 'idle')}
-        </span>
+        <span className="text-sm font-medium">{getStatusText(currentSync?.status || 'idle')}</span>
       </div>
 
       {/* Sync Details */}
@@ -54,18 +52,15 @@ export function SyncStatus() {
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {currentSync.status === 'completed' && (
             <span>
-              {currentSync.emails_synced} emails • {formatDistanceToNow(new Date(currentSync.completed_at!))} ago
+              {currentSync.emails_synced} emails •{' '}
+              {formatDistanceToNow(new Date(currentSync.completed_at!))} ago
             </span>
           )}
           {currentSync.status === 'failed' && currentSync.error_message && (
-            <span className="text-red-500">
-              {currentSync.error_message}
-            </span>
+            <span className="text-red-500">{currentSync.error_message}</span>
           )}
           {currentSync.status === 'processing' && (
-            <span>
-              Started {formatDistanceToNow(new Date(currentSync.started_at!))} ago
-            </span>
+            <span>Started {formatDistanceToNow(new Date(currentSync.started_at!))} ago</span>
           )}
         </div>
       )}
@@ -84,11 +79,7 @@ export function SyncStatus() {
       </button>
 
       {/* Error Display */}
-      {error && (
-        <div className="text-xs text-red-500 ml-2">
-          {error}
-        </div>
-      )}
+      {error && <div className="text-xs text-red-500 ml-2">{error}</div>}
     </div>
-  );
+  )
 }

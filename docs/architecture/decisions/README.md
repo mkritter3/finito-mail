@@ -38,6 +38,7 @@ What other options were evaluated?
 | [ADR-0002](./0002-redis-pubsub-for-realtime.md) | Use Redis Pub/Sub for Real-time Updates | Accepted | 2025-01-23 |
 | [ADR-0003](./0003-migrate-to-battle-tested-solutions.md) | Migrate to Battle-tested Solutions | Accepted | 2025-01-24 |
 | [ADR-0004](./0004-client-first-architecture.md) | Client-first Architecture with IndexedDB | Accepted | 2024-11-01 |
+| [ADR-0005](./0005-supabase-ssr-auth-migration.md) | Migration from localStorage to Supabase SSR Cookie-Based Authentication | Accepted | 2025-01-28 |
 
 ## Creating a New ADR
 

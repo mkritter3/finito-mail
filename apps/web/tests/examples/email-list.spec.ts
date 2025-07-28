@@ -7,15 +7,15 @@ test.describe('Email List Page', () => {
 
   test('should display a list of emails', async ({ page }) => {
     // Intercept the API call and return mock data
-    await page.route('**/api/emails', async (route) => {
+    await page.route('**/api/emails', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         json: {
           emails: mockEmails,
           total: mockEmails.length,
-          hasMore: false
-        }
+          hasMore: false,
+        },
       })
     })
 
@@ -29,11 +29,11 @@ test.describe('Email List Page', () => {
 
   test('should show empty state when no emails', async ({ page }) => {
     // Mock empty response
-    await page.route('**/api/emails', async (route) => {
+    await page.route('**/api/emails', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        json: emptyEmailsResponse
+        json: emptyEmailsResponse,
       })
     })
 
@@ -45,11 +45,11 @@ test.describe('Email List Page', () => {
 
   test('should handle API errors gracefully', async ({ page }) => {
     // Mock error response
-    await page.route('**/api/emails', async (route) => {
+    await page.route('**/api/emails', async route => {
       await route.fulfill({
         status: 500,
         contentType: 'application/json',
-        json: errorEmailsResponse
+        json: errorEmailsResponse,
       })
     })
 

@@ -17,6 +17,7 @@ This section contains comprehensive documentation about Finito Mail's system arc
 ### Feature Architecture
 - **[Search Architecture](./SEARCH_ARCHITECTURE.md)** - Hybrid search with local cache and server proxy
 - **[Snooze Architecture](./SNOOZE_ARCHITECTURE.md)** - Redis sorted sets for time-based features
+- **[Auth Migration Guide](./auth-migration-guide.md)** - Supabase SSR authentication implementation guide
 
 ## 🎯 Key Architectural Principles
 
@@ -129,6 +130,7 @@ When working with our architecture:
 - [Performance Guide](../development/PERFORMANCE.md)
 - [Security Patterns](../development/SECURITY_PATTERNS.md)
 - [API Design](../api/API_DESIGN.md)
+- [Architecture Decision Records](./decisions/) - ADRs documenting key architectural decisions
 
 ## 🎓 Learning Path
 

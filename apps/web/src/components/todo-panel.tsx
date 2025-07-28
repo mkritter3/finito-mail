@@ -12,10 +12,7 @@ export function TodoPanel({ isOpen, onClose }: TodoPanelProps) {
     <div className="fixed right-0 top-0 h-full w-80 bg-background border-l border-border shadow-lg z-50 animate-slide-in">
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h2 className="text-lg font-semibold">Todos</h2>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-accent rounded-md"
-        >
+        <button onClick={onClose} className="p-1 hover:bg-accent rounded-md">
           ✕
         </button>
       </div>

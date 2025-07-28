@@ -20,7 +20,9 @@ export default function AuthPage() {
     })
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         router.push('/mail')
       }
@@ -38,12 +40,13 @@ export default function AuthPage() {
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          scopes: 'email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send',
+          scopes:
+            'email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send',
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent'
-          }
-        }
+            prompt: 'consent',
+          },
+        },
       })
 
       if (error) {
@@ -73,14 +76,9 @@ export default function AuthPage() {
               <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
             </div>
           )}
-          
+
           <div className="space-y-4">
-            <Button
-              onClick={handleGoogleAuth}
-              disabled={isLoading}
-              className="w-full"
-              size="lg"
-            >
+            <Button onClick={handleGoogleAuth} disabled={isLoading} className="w-full" size="lg">
               {isLoading ? 'Connecting...' : 'Continue with Google'}
             </Button>
           </div>
