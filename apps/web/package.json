@@ -18,9 +18,11 @@
     "playwright:install": "playwright install",
     "test:rls": "playwright test tests/security/rls-comprehensive-test.spec.ts",
     "test:rls:setup": "tsx scripts/setup-rls-test-users.ts",
+    "test:rls:setup:simple": "tsx scripts/setup-rls-test-users-simple.ts",
     "rls:phase1:baseline": "tsx scripts/rls-phase1-baseline-simple.ts",
     "rls:phase2:generate-migration": "tsx scripts/generate-rls-migration.ts",
-    "rls:phase2:verify": "tsx scripts/rls-phase2-verify.ts"
+    "rls:phase2:verify": "tsx scripts/rls-phase2-verify.ts",
+    "rls:generate-test-data": "tsx scripts/generate-test-data-sql.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

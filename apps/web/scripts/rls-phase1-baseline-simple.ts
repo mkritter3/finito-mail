@@ -11,8 +11,8 @@ import dotenv from 'dotenv'
 import path from 'path'
 import fs from 'fs/promises'
 
-// Load environment variables
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
+// Load environment variables from root
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env.local') })
 
 // Table configuration for index verification
 const TABLES_TO_VERIFY = [

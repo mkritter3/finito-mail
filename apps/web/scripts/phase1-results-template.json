@@ -1,0 +1,54 @@
+{
+  "phase": "baseline",
+  "timestamp": "2025-07-28T05:03:08.306Z",
+  "postgresVersion": "TO_BE_FILLED",
+  "rlsEnabled": false,
+  "indexVerification": {
+    "allIndexesPresent": false,
+    "missingIndexes": []
+  },
+  "performanceMetrics": {
+    "dashboardLoad": {
+      "executionTime": 0,
+      "planningTime": 0,
+      "usesIndex": false,
+      "rowsReturned": 0,
+      "notes": ""
+    },
+    "emailSearch": {
+      "executionTime": 0,
+      "planningTime": 0,
+      "usesIndex": false,
+      "rowsReturned": 0,
+      "notes": ""
+    },
+    "ruleEvaluation": {
+      "executionTime": 0,
+      "planningTime": 0,
+      "usesIndex": false,
+      "rowsReturned": 0,
+      "notes": ""
+    },
+    "bulkUpdate": {
+      "executionTime": 0,
+      "planningTime": 0,
+      "usesIndex": false,
+      "rowsUpdated": 0,
+      "notes": ""
+    },
+    "labelAggregation": {
+      "executionTime": 0,
+      "planningTime": 0,
+      "usesIndex": false,
+      "rowsReturned": 0,
+      "notes": ""
+    },
+    "complexJoin": {
+      "executionTime": 0,
+      "planningTime": 0,
+      "usesIndex": false,
+      "rowsReturned": 0,
+      "notes": ""
+    }
+  }
+}

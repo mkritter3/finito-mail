@@ -12,8 +12,8 @@ import dotenv from 'dotenv'
 import path from 'path'
 import fs from 'fs/promises'
 
-// Load environment variables
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
+// Load environment variables from root - use staging for RLS testing
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env.staging') })
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
