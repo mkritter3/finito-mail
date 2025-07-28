@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide clarifies the different environments for RLS testing and when to use each.
+This guide clarifies the different environments for RLS testing. **During development, we focus exclusively on the local environment.**
 
 ## Environment Types
 
@@ -24,22 +24,24 @@ This guide clarifies the different environments for RLS testing and when to use 
 - **Purpose**: Live application
 - **Never test RLS here!**
 
-## When to Use Each Environment
+## Current Development Approach
 
-### Use Local Development For:
-✅ Initial RLS policy development
-✅ Creating test users freely
-✅ Testing RLS policies without restrictions
-✅ Performance baseline testing
-✅ Debugging RLS issues
-✅ Running automated tests
+**We are focusing on local development only during the current development stage.**
 
-### Use Staging For:
-✅ Final validation before production
-✅ Testing with production-like data
-✅ Integration testing with other services
-✅ Performance testing at scale
-❌ Not ideal for initial development (restrictions)
+### Why Local Development?
+✅ Full control over schema and data
+✅ No external dependencies or restrictions
+✅ Fast iteration and debugging
+✅ Can fix issues immediately
+✅ Perfect for RLS policy development
+✅ Matches production patterns
+
+### Staging/Production (Future)
+These environments will be used later for:
+- Final validation before release
+- Integration testing
+- Performance testing at scale
+- User acceptance testing
 
 ## Local Development Setup
 

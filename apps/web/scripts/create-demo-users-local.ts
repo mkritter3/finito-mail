@@ -98,11 +98,6 @@ function generateSampleEmails(userId: string, userEmail: string, count: number =
     const daysAgo = Math.floor(Math.random() * 30)
     const hoursAgo = Math.floor(Math.random() * 24)
     const isRead = Math.random() > 0.3 // 70% read
-    const hasAttachment = Math.random() > 0.8 // 20% have attachments
-    
-    const labels = ['INBOX']
-    if (Math.random() > 0.7) labels.push('IMPORTANT')
-    if (Math.random() > 0.9) labels.push('STARRED')
 
     emails.push({
       user_id: userId,
@@ -110,15 +105,10 @@ function generateSampleEmails(userId: string, userEmail: string, count: number =
       gmail_thread_id: `demo-${userId}-thread-${Math.floor(i / 2)}-${now}`,
       subject: `${subject}${i > 5 ? ' - Follow up' : ''}`,
       snippet: `This is a sample email snippet for ${subject.toLowerCase()}. It contains preview text that would normally show...`,
-      from_email: sender.email,
-      from_name: sender.name,
-      to_emails: [userEmail],
-      cc_emails: i % 3 === 0 ? ['team@company.local'] : null,
+      from_address: { email: sender.email, name: sender.name },
+      to_addresses: [{ email: userEmail, name: userEmail.split('@')[0] }],
       received_at: new Date(now - (daysAgo * 86400000) - (hoursAgo * 3600000)).toISOString(),
-      is_read: isRead,
-      labels: labels,
-      has_attachments: hasAttachment,
-      raw_email: null // Not storing full email content for demos
+      is_read: isRead
     })
   }
 
@@ -188,42 +178,40 @@ async function createDemoUsers() {
     try {
       console.log(`\n👤 Creating ${demoUser.email}...`)
 
-      // Create user using admin API
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // Try to sign up the user first
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: demoUser.email,
         password: demoUser.password,
-        email_confirm: true, // Auto-confirm for local dev
-        user_metadata: {
-          full_name: demoUser.name,
-          ...demoUser.metadata
+        options: {
+          data: {
+            full_name: demoUser.name,
+            ...demoUser.metadata
+          }
         }
       })
 
-      if (authError) {
-        // Check if user already exists
-        const { data: existingUser } = await supabase.auth.admin.getUserByEmail(demoUser.email)
-        
-        if (existingUser) {
-          console.log(`   ✓ User already exists (ID: ${existingUser.id})`)
-          
-          // Update password to ensure it matches
-          await supabase.auth.admin.updateUserById(existingUser.id, {
-            password: demoUser.password
-          })
-          
+      if (signUpError) {
+        // Try to sign in if user exists
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: demoUser.email,
+          password: demoUser.password
+        })
+
+        if (signInData?.user) {
+          console.log(`   ✓ User already exists (ID: ${signInData.user.id})`)
           createdUsers.push({
             ...demoUser,
-            id: existingUser.id
+            id: signInData.user.id
           })
         } else {
-          console.error(`   ❌ Failed to create: ${authError.message}`)
+          console.error(`   ❌ Failed to create/sign in: ${signUpError.message}`)
           continue
         }
-      } else if (authData.user) {
-        console.log(`   ✅ Created successfully (ID: ${authData.user.id})`)
+      } else if (signUpData.user) {
+        console.log(`   ✅ Created successfully (ID: ${signUpData.user.id})`)
         createdUsers.push({
           ...demoUser,
-          id: authData.user.id
+          id: signUpData.user.id
         })
       }
 
@@ -277,6 +265,9 @@ async function createDemoUsers() {
         }
         
         console.log(`   ✓ Created ${rules.length} sample rules`)
+        
+        // Sign out to prepare for next user
+        await supabase.auth.signOut()
       }
 
     } catch (error) {
