@@ -9,7 +9,10 @@ export const maxDuration = 300 // 5 minutes max
 const logger = createScopedLogger('cron.renew-gmail-watches')
 
 // Initialize Supabase client
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SECRET_KEY!
+)
 
 export async function GET(request: NextRequest) {
   const timer = logger.time('renew-gmail-watches')
