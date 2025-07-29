@@ -1,9 +1,10 @@
 'use server'
 
 import { z } from 'zod'
-import { emailSync } from '@finito/provider-client'
+import { gmailService } from '@/lib/services/gmail-service.server'
 import { ServerActionResult, SyncResult } from '@/lib/types'
 import { createScopedLogger } from '@/lib/logger'
+import { createAdminClient } from '@/lib/supabase/server'
 
 const logger = createScopedLogger('email-sync')
 
@@ -36,15 +37,45 @@ export async function syncRecentEmails(count: number = 5): Promise<ServerActionR
   const { count: validatedCount } = validation.data
 
   try {
-    await emailSync.syncRecentEmails(validatedCount)
+    // Fetch emails from Gmail using server-safe service
+    const emails = await gmailService.syncRecentEmails(validatedCount)
+    
+    // Store emails in Supabase
+    const supabase = createAdminClient()
+    let storedCount = 0
+    
+    for (const email of emails) {
+      try {
+        await supabase.from('email_metadata').upsert({
+          id: email.id,
+          thread_id: email.threadId,
+          from_email: email.from,
+          to_email: email.to,
+          subject: email.subject,
+          body_snippet: email.body.substring(0, 200),
+          sent_at: email.date,
+          is_read: email.isRead,
+          is_starred: email.isStarred,
+          folder: email.folder,
+          labels: email.labels,
+          provider: email.provider,
+        })
+        storedCount++
+      } catch (err) {
+        logger.error('Failed to store email', { emailId: email.id, error: err })
+      }
+    }
+    
     logger.info('Email sync completed successfully', {
       action: 'syncRecentEmails',
-      count: validatedCount,
+      fetched: emails.length,
+      stored: storedCount,
     })
+    
     return {
       data: {
         success: true,
-        emailsSynced: validatedCount,
+        emailsSynced: storedCount,
         errors: [],
       },
       error: null,
@@ -74,7 +105,11 @@ export async function checkAuthentication(): Promise<
   logger.info('Checking user authentication', { action: 'checkAuthentication' })
 
   try {
-    const isAuthenticated = await emailSync.isAuthenticated()
+    // Check if user has Google tokens stored
+    const { getGoogleAccessToken } = await import('@/lib/server/google-auth')
+    const token = await getGoogleAccessToken()
+    const isAuthenticated = token !== null
+    
     logger.info('Authentication check completed', {
       action: 'checkAuthentication',
       authenticated: isAuthenticated,
@@ -130,16 +165,46 @@ export async function syncFolder(
   const { folder: validatedFolder, maxResults: validatedMaxResults } = validation.data
 
   try {
-    await emailSync.syncFolder(validatedFolder, validatedMaxResults)
+    // Fetch emails from Gmail folder using server-safe service
+    const emails = await gmailService.syncFolder(validatedFolder, validatedMaxResults)
+    
+    // Store emails in Supabase
+    const supabase = createAdminClient()
+    let storedCount = 0
+    
+    for (const email of emails) {
+      try {
+        await supabase.from('email_metadata').upsert({
+          id: email.id,
+          thread_id: email.threadId,
+          from_email: email.from,
+          to_email: email.to,
+          subject: email.subject,
+          body_snippet: email.body.substring(0, 200),
+          sent_at: email.date,
+          is_read: email.isRead,
+          is_starred: email.isStarred,
+          folder: email.folder,
+          labels: email.labels,
+          provider: email.provider,
+        })
+        storedCount++
+      } catch (err) {
+        logger.error('Failed to store email', { emailId: email.id, error: err })
+      }
+    }
+    
     logger.info('Folder sync completed successfully', {
       action: 'syncFolder',
       folder: validatedFolder,
-      maxResults: validatedMaxResults,
+      fetched: emails.length,
+      stored: storedCount,
     })
+    
     return {
       data: {
         success: true,
-        emailsSynced: validatedMaxResults,
+        emailsSynced: storedCount,
         errors: [],
       },
       error: null,
@@ -211,30 +276,13 @@ export async function sendEmail(emailData: {
   const validatedData = validation.data
 
   try {
-    // Import Gmail client dynamically on server-side
-    const { gmailClient } = await import('@finito/provider-client')
-
-    // Build email message
-    const messageParts = [
-      `To: ${validatedData.to}`,
-      validatedData.cc ? `Cc: ${validatedData.cc}` : '',
-      validatedData.bcc ? `Bcc: ${validatedData.bcc}` : '',
-      `Subject: ${validatedData.subject}`,
-      'Content-Type: text/plain; charset=utf-8',
-      '',
-      validatedData.body,
-    ]
-      .filter(Boolean)
-      .join('\n')
-
-    const encodedMessage = btoa(messageParts)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '')
-
-    // Send email using Gmail client
-    const result = await gmailClient.sendEmail({
-      raw: encodedMessage,
+    // Send email using server-safe Gmail service
+    const result = await gmailService.sendEmail({
+      to: validatedData.to,
+      cc: validatedData.cc,
+      bcc: validatedData.bcc,
+      subject: validatedData.subject,
+      body: validatedData.body,
       threadId: validatedData.threadId,
     })
 

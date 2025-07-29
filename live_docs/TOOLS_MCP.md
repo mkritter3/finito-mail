@@ -4,7 +4,7 @@ version: '2.0'
 last_verified: '2025-07-10T20:53:50Z'
 status: active
 description: MCP tools reference with Zen-based commands
-generation_timestamp: '2025-07-15T03:09:38.161Z'
+generation_timestamp: '2025-07-29T16:31:03.942Z'
 ---
 
 
@@ -28,14 +28,8 @@ generation_timestamp: '2025-07-15T03:09:38.161Z'
 # Access MCP functionality via Zen tools (CURRENT METHOD)
 claude "Use zen tools to access MCP capabilities"
 
-# Multi-AI collaboration for production architecture
+# Multi-AI collaboration
 claude "Use zen chat with gemini-2.5-pro model for strategic analysis. use context7"
-
-# Production infrastructure review
-claude "Use zen thinkdeep to analyze production readiness and infrastructure. use context7"
-
-# Code review with security focus  
-claude "Use zen codereview to analyze security and performance patterns. use context7"
 ```
 
 ## 🛠️ Available MCP Tools via Zen

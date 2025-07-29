@@ -4,7 +4,7 @@ version: '1.0'
 last_verified: '2025-07-10T20:53:50Z'
 status: active
 description: Smart documentation router for Claude CLI
-generation_timestamp: '2025-07-15T03:09:38.155Z'
+generation_timestamp: '2025-07-29T16:31:03.936Z'
 ---
 
 
@@ -43,7 +43,7 @@ generation_timestamp: '2025-07-15T03:09:38.155Z'
 ### 🚀 Universal Commands (Always Available)
 
 ```bash
-# Start development environment (includes production infrastructure)
+# Start development environment (includes GUI support)
 dev
 
 # Test GUI forwarding (after dev is running)
@@ -57,12 +57,6 @@ claude "Use zen tools to access MCP capabilities"
 
 # Direct Gemini access ONLY via Zen (NOT direct gemini command)
 claude "Use zen chat with gemini model for strategic analysis. use context7"
-
-# Production-ready commands (VERIFIED WORKING)
-npm run start:prod     # Start with production infrastructure
-npm run build         # Build for production deployment
-npm run lint          # Code quality checks
-npm run type-check    # TypeScript validation
 ```
 
 ## 🏢 Core Workflow Pattern
