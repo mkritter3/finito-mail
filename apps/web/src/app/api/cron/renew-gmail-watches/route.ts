@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/server'
 import { renewGmailWatch } from '@/lib/gmail-watch'
 import { createScopedLogger } from '@/lib/logger'
 
@@ -8,14 +8,11 @@ export const maxDuration = 300 // 5 minutes max
 
 const logger = createScopedLogger('cron.renew-gmail-watches')
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-)
-
 export async function GET(request: NextRequest) {
   const timer = logger.time('renew-gmail-watches')
+  
+  // Initialize Supabase admin client inside the function
+  const supabase = createAdminClient()
 
   try {
     // Verify cron secret to prevent unauthorized access

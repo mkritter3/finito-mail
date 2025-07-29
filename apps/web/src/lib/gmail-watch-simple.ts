@@ -1,11 +1,5 @@
 import { google } from 'googleapis'
-import { createClient } from '@supabase/supabase-js'
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-)
+import { createAdminClient } from './supabase/server'
 
 interface SetupWatchParams {
   userId: string
@@ -24,6 +18,8 @@ export async function setupGmailWatch({
   refreshToken,
   expiresAt,
 }: SetupWatchParams) {
+  const supabase = createAdminClient()
+  
   try {
     // Create OAuth2 client
     const oauth2Client = new google.auth.OAuth2(

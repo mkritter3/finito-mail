@@ -1,14 +1,8 @@
 import { google } from 'googleapis'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from './supabase/server'
 import { createScopedLogger } from './logger'
 
 const logger = createScopedLogger('gmail-watch')
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-)
 
 interface SetupWatchParams {
   userId: string
@@ -28,6 +22,7 @@ export async function setupGmailWatch({
   expiresAt,
 }: SetupWatchParams) {
   const timer = logger.time('setup-gmail-watch')
+  const supabase = createAdminClient()
 
   try {
     // Create OAuth2 client
@@ -135,6 +130,7 @@ export async function setupGmailWatch({
  */
 export async function renewGmailWatch(userId: string) {
   const timer = logger.time('renew-gmail-watch')
+  const supabase = createAdminClient()
 
   try {
     // Get user's account information
@@ -172,6 +168,7 @@ export async function renewGmailWatch(userId: string) {
  */
 export async function stopGmailWatch(userId: string) {
   const timer = logger.time('stop-gmail-watch')
+  const supabase = createAdminClient()
 
   try {
     // Get watch information

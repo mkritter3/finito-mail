@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/nextjs'
 import { timingSafeEqual, randomUUID } from 'crypto'
 import { SSEMessageType } from '@/app/api/sse/email-updates/route'
 import { getPublisherClient } from '@/lib/redis-pubsub'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/server'
 import { GmailClientEnhanced } from '@finito/provider-client'
 import { google } from 'googleapis'
 import { Ratelimit } from '@upstash/ratelimit'
@@ -106,11 +106,6 @@ async function verifyPubSubSignature(request: NextRequest): Promise<boolean> {
   }
 }
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-)
 
 // Process Gmail notification
 async function processGmailNotification(notification: GmailNotification) {
@@ -118,6 +113,9 @@ async function processGmailNotification(notification: GmailNotification) {
   const publisher = getPublisherClient()
 
   try {
+    // Initialize Supabase admin client inside the function
+    const supabase = createAdminClient()
+
     // Ensure Redis is connected
     if (publisher.status !== 'ready') {
       await publisher.connect()
