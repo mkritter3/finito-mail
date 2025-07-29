@@ -1,6 +1,6 @@
 # Stage 1: Builder
 # This stage installs all dependencies, builds the source code, and creates the final artifacts.
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy all package.json and lock files first to leverage Docker cache
@@ -19,7 +19,7 @@ RUN npm run build --workspace=@finito/web
 
 # Stage 2: Runner
 # This stage creates the final, lean production image.
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
